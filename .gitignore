@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+
+# Ignore venv folders in all services
+api-gateway/venv/
+services/*/venv/
+
+# Ignore Python cache files
+__pycache__/
+**/__pycache__/
+
+# Ignore environment files
+.env
+services/*/.env
+api-gateway/.env
+
+# Ignore Docker-related temporary files if any
+*.dockerfile
+*.log
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+
+# VSCode / JetBrains / IDE files
+.vscode/
+.idea/

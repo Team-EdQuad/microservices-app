@@ -25,7 +25,7 @@ async def fetch_all_clubs():
 async def add_club(club: dict):
     return await create_club(club)
 
-NON_ACADEMIC_SERVICE_URL = "http://127.0.0.1:8002" 
+NON_ACADEMIC_SERVICE_URL = "http://127.0.0.1:8003" 
 @app.get("/item/nonacademic/{item_id}")
 async def get_nonacademic_item(item_id: int):
     try:
@@ -38,3 +38,19 @@ async def get_nonacademic_item(item_id: int):
         raise HTTPException(status_code=exc.response.status_code, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Error fetching item {item_id}: {str(exc)}")
+
+
+TEST_SERVICE_URL = "http://127.0.0.1:8004" 
+@app.get("/api/item/{item_id}")
+async def get_nonacademic_item(item_id: int):
+    try:
+        async with httpx.AsyncClient() as client:
+            # Add trailing slash if the Non-Academic service requires it
+            response = await client.get(f"{TEST_SERVICE_URL}/item/{item_id}")
+            response.raise_for_status()  # Ensure HTTP errors are raised
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+            raise HTTPException(status_code=exc.response.status_code, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error fetching item {item_id}: {str(exc)}")
+    

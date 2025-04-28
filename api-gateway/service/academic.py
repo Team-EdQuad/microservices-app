@@ -15,6 +15,17 @@ async def get_subject_names(student_id: str):
         raise HTTPException(status_code=500, detail=f"Error fetching subjects: {str(exc)}")
 
 
+async def get_content_details(student_id, subject_id):
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{ACADEMIC_SERVICE_URL}/students/{student_id}/subjects/{subject_id}/content")
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error fetching content: {str(exc)}")
+
 
 
 

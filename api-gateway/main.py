@@ -4,15 +4,15 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
-
-
 from fastapi import FastAPI, HTTPException
 #from services.nonacademic import get_all_sports, create_sport, get_all_clubs, create_club, filter_sports
-from service.academic import get_subject_names
+
 import httpx 
 from fastapi.responses import JSONResponse
 from typing import List
-from services.academic.app.models.academic import SubjectResponse
+#from services.academic.app.models.academic import SubjectResponse
+from service.academic import get_subject_names,get_content_details
+
 
 
 app = FastAPI(title="Microservices API Gateway") 
@@ -56,10 +56,14 @@ app = FastAPI(title="Microservices API Gateway")
 
 ACADEMIC_SERVICE_URL = "http://127.0.0.1:8002"
 
-@app.get("/subject/{student_id}", response_model=List[SubjectResponse])
+@app.get("/api/subject/{student_id}", response_model=List)
 async def get_subjects(student_id: str):
     return await get_subject_names(student_id)
 
+
+@app.get("/api/content/{student_id}/{subject_id}", response_model=List)
+async def get_content(student_id: str, subject_id: str):
+    return await get_content_details(student_id, subject_id)
 
 
 

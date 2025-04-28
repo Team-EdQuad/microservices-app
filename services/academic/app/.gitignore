@@ -1,5 +1,5 @@
 .env
 venv/*
-uploads/assignment/*
-uploads/content/*
-uploads/submission/*
+..uploads/assignment/*
+..uploads/content/*
+..uploads/submission/*

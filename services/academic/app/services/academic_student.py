@@ -19,7 +19,7 @@ ALLOWED_EXTENSIONS = {"pdf", "txt"}  # Allowed file types
 router = APIRouter()
 
 #subject interface
-@router.get("/subject/{student_id}", response_model=List[SubjectResponse])
+@router.get("/students/{student_id}/subjects", response_model=List[SubjectResponse])
 async def get_subject_names(student_id: str):
     # Fetch student document from 'students' collection
     student = db["student"].find_one({"student_id": student_id})

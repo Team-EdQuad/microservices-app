@@ -1,7 +1,8 @@
 import sys
 import os
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'services')))
 
 
 from fastapi import FastAPI, HTTPException
@@ -11,7 +12,7 @@ import httpx
 from fastapi.responses import JSONResponse
 from typing import List
 #from services.academic.app.models.academic import SubjectResponse
-from service.academic import get_subject_names,get_content_details
+from services.academic import get_subject_names,get_student_content
 
 
 
@@ -37,24 +38,6 @@ app = FastAPI(title="Microservices API Gateway")
 # async def add_club(club: dict):
 #     return await create_club(club)
 
-# NON_ACADEMIC_SERVICE_URL = "http://127.0.0.1:8003" 
-# @app.get("/item/nonacademic/{item_id}")
-# async def get_nonacademic_item(item_id: int):
-#     try:
-#         async with httpx.AsyncClient() as client:
-#             # Add trailing slash if the Non-Academic service requires it
-#             response = await client.get(f"{NON_ACADEMIC_SERVICE_URL}/item/nonacademic/{item_id}")
-#             response.raise_for_status()  # Ensure HTTP errors are raised
-#             return response.json()
-#     except httpx.HTTPStatusError as exc:
-#         raise HTTPException(status_code=exc.response.status_code, detail=str(exc))
-#     except Exception as exc:
-#         raise HTTPException(status_code=500, detail=f"Error fetching item {item_id}: {str(exc)}")
-
-
-
-
-ACADEMIC_SERVICE_URL = "http://127.0.0.1:8002"
 
 @app.get("/api/subject/{student_id}", response_model=List)
 async def get_subjects(student_id: str):
@@ -63,23 +46,16 @@ async def get_subjects(student_id: str):
 
 @app.get("/api/content/{student_id}/{subject_id}", response_model=List)
 async def get_content(student_id: str, subject_id: str):
-    return await get_content_details(student_id, subject_id)
+    return await get_student_content(student_id, subject_id)
+
+# @app.get("/api/subject/{student_id}", response_model=List)
+# async def get_subjects(student_id: str):
+#     return await get_subject_names(student_id)
 
 
+# @app.get("/api/content/{student_id}/{subject_id}", response_model=List)
+# async def get_content(student_id: str, subject_id: str):
+#     return await get_content_details(student_id, subject_id)
 
 
-# TEST_SERVICE_URL = "http://127.0.0.1:8002" 
-
-# @app.get("/api/item/{item_id}")
-# async def get_nonacademic_item(item_id: int):
-#     try:
-#         async with httpx.AsyncClient() as client:
-#             # Add trailing slash if the Non-Academic service requires it
-#             response = await client.get(f"{TEST_SERVICE_URL}/item/{item_id}")
-#             response.raise_for_status()  # Ensure HTTP errors are raised
-#             return response.json()
-#     except httpx.HTTPStatusError as exc:
-#         raise HTTPException(status_code=exc.response.status_code, detail=str(exc))
-#     except Exception as exc:
-#         raise HTTPException(status_code=500, detail=f"Error fetching item {item_id}: {str(exc)}")
 

@@ -32,4 +32,14 @@ async def get_student_content(student_id: str, subject_id: str):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Error fetching content: {str(exc)}")
 
-
+async def get_all_assignments(student_id: str, subject_id: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{ACADEMIC_SERVICE_URL}/show_assignments/{student_id}/{subject_id}"
+            response = await client.get(url)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error fetching assignments: {str(exc)}")

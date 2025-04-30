@@ -11,33 +11,11 @@ from fastapi import FastAPI, HTTPException
 import httpx 
 from fastapi.responses import JSONResponse
 from typing import List
-#from services.academic.app.models.academic import SubjectResponse
-from services.academic import get_subject_names,get_student_content
+from services.academic import get_subject_names,get_student_content,get_all_assignments
 
 
 
 app = FastAPI(title="Microservices API Gateway") 
-
-# @app.get("/api/nonacademic/sports", response_model=list)
-# async def fetch_all_sports():
-#     return await get_all_sports()
-
-# @app.post("/api/nonacademic/sports", response_model=dict)
-# async def add_sport(sport: dict):
-#     return await create_sport(sport)
-
-# @app.get("/api/nonacademic/sports/filter", response_model=list)
-# async def filter_sports_endpoint(type: str = None, category: str = None):
-#     return await filter_sports(type, category)
-
-# @app.get("/api/nonacademic/clubs", response_model=list)
-# async def fetch_all_clubs():
-#     return await get_all_clubs()
-
-# @app.post("/api/nonacademic/clubs", response_model=dict)
-# async def add_club(club: dict):
-#     return await create_club(club)
-
 
 @app.get("/api/subject/{student_id}", response_model=List)
 async def get_subjects(student_id: str):
@@ -48,14 +26,14 @@ async def get_subjects(student_id: str):
 async def get_content(student_id: str, subject_id: str):
     return await get_student_content(student_id, subject_id)
 
-# @app.get("/api/subject/{student_id}", response_model=List)
-# async def get_subjects(student_id: str):
-#     return await get_subject_names(student_id)
 
-
-# @app.get("/api/content/{student_id}/{subject_id}", response_model=List)
-# async def get_content(student_id: str, subject_id: str):
-#     return await get_content_details(student_id, subject_id)
-
-
+@app.get("/api/assignments/{student_id}/{subject_id}")
+async def get_assignments(student_id: str, subject_id: str):
+   
+    try:
+        return await get_all_assignments(student_id, subject_id)
+    except HTTPException as exc:
+        raise exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(exc)}")
 

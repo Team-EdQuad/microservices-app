@@ -3,7 +3,7 @@ from .database import class_table, teacher_table, subject_table, student_table, 
 from .database import academic_attendance_table, exam_table, non_academic_attendance_table, content_table, student_content_table
 from ..schemas.admin_dashboard import all_progress, stats
 from ..models.admin_dashboard import ExamMarksResponse, StudentProgress, UserLite
-from bson.objectid import ObjectId
+from bson.objectid import ObjectId 
 from typing import List, Optional
 from datetime import datetime, timedelta
 

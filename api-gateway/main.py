@@ -71,3 +71,6 @@ async def mark_content_completed(content_id: str):
     if not success:
         raise HTTPException(status_code=404, detail="Content not found or not accessible")
     return {"message": "Content marked as completed"}
+
+
+###teacher 

@@ -109,3 +109,6 @@ async def mark_content_done(content_id: str):
         raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to update content status: {str(exc)}")
+    
+
+###teacher 

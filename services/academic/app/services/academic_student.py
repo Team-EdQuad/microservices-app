@@ -392,5 +392,3 @@ async def update_content_status(content_id: str):
     else:
         return {"message": "Content status update failed"}
 
-
-

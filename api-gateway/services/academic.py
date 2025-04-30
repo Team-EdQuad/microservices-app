@@ -1,6 +1,6 @@
 import os
 import httpx
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
 ACADEMIC_SERVICE_URL = "http://127.0.0.1:8002"
 
 async def get_subject_names(student_id: str):
@@ -84,15 +84,14 @@ async def get_exam_marks(student_id: str):
         raise HTTPException(status_code=500, detail=f"Error fetching exam marks: {str(exc)}")
 
 
-async def submit_assignment(student_id: str, assignment_id: str, file_path: str):
+async def upload_assignment_file(student_id: str, assignment_id: str, file: UploadFile):
     try:
         async with httpx.AsyncClient() as client:
-            with open(file_path, "rb") as f:
-                files = {"file": (os.path.basename(file_path), f, "application/octet-stream")}
-                url = f"{ACADEMIC_SERVICE_URL}/submission/{student_id}/{assignment_id}"
-                response = await client.post(url, files=files)
-                response.raise_for_status()
-                return response.json()
+            files = {"file": (file.filename, await file.read(), file.content_type)}
+            url = f"{ACADEMIC_SERVICE_URL}/submission/{student_id}/{assignment_id}"
+            response = await client.post(url, files=files)
+            response.raise_for_status()
+            return response.json()
     except httpx.HTTPStatusError as exc:
         raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
     except Exception as exc:

@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException, UploadFile, File
 import httpx 
 from fastapi.responses import JSONResponse
 from typing import List
-from services.academic import get_subject_names,get_student_content,get_all_assignments,get_assignment_by_id,get_assignment_marks,get_exam_marks,submit_assignment,mark_content_done
+from services.academic import get_subject_names,get_student_content,get_all_assignments,get_assignment_by_id,get_assignment_marks,get_exam_marks, upload_assignment_file ,mark_content_done
 
 app = FastAPI(title="Microservices API Gateway") 
 
@@ -57,25 +57,17 @@ async def fetch_exam_marks(student_id: str):
     return marks
 
 @app.post("/api/submission/{student_id}/{assignment_id}")
-async def upload_assignment_file(
+async def submit_assignment_file(
     student_id: str,
     assignment_id: str,
     file: UploadFile = File(...)
 ):
-    # TODO: Validate file type, size, submission deadline
-    result = await submit_assignment(student_id, assignment_id, file)
+    result = await upload_assignment_file(student_id, assignment_id, file)
     return {"message": "Submission successful", "data": result}
 
-
-@app.patch("/api/content/{content_id}/mark/{student_id}")
-async def mark_content_completed(content_id: str, student_id: str):
-    success = await mark_content_done(content_id, student_id)
+@app.post("/api/content/{content_id}")
+async def mark_content_completed(content_id: str):
+    success = await mark_content_done(content_id)
     if not success:
         raise HTTPException(status_code=404, detail="Content not found or not accessible")
     return {"message": "Content marked as completed"}
-
-
-
-
-
-

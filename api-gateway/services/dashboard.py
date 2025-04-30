@@ -1,4 +1,134 @@
 import httpx
 from fastapi import HTTPException
+from fastapi.responses import JSONResponse
+
 
 DASHBOARD_SERVICE_URL = "http://127.0.0.1:8006"
+
+
+#---------------Student Dashboard Routes------------------
+async def get_student_progress(student_id: str, class_id: str):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{DASHBOARD_SERVICE_URL}/student/{student_id}/{class_id}/progress")
+        response.raise_for_status()
+        return response.json()
+
+async def get_student_assignments(student_id: str, class_id: str):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{DASHBOARD_SERVICE_URL}/student/{student_id}/{class_id}/assignments")
+        response.raise_for_status()
+        return response.json()
+
+async def get_student_attendance(student_id: str, class_id: str):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{DASHBOARD_SERVICE_URL}/student/{student_id}/{class_id}/attendance")
+        response.raise_for_status()
+        return response.json()
+
+async def get_student_non_academic(student_id: str, class_id: str):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{DASHBOARD_SERVICE_URL}/student/{student_id}/{class_id}/non-academic")
+        response.raise_for_status()
+        return response.json()
+
+# Optional: Fetch all at once (bundle call inside API gateway)
+# async def get_full_dashboard(student_id: str, class_id: str):
+#     async with httpx.AsyncClient() as client:
+#         progress_task = client.get(f"{DASHBOARD_SERVICE_URL}/{student_id}/{class_id}/progress")
+#         assignments_task = client.get(f"{DASHBOARD_SERVICE_URL}/{student_id}/{class_id}/assignments")
+#         attendance_task = client.get(f"{DASHBOARD_SERVICE_URL}/{student_id}/{class_id}/attendance")
+#         non_academic_task = client.get(f"{DASHBOARD_SERVICE_URL}/{student_id}/{class_id}/non-academic")
+
+#         responses = await httpx.AsyncClient.gather(
+#             progress_task,
+#             assignments_task,
+#             attendance_task,
+#             non_academic_task
+#         )
+
+#         return {
+#             "progress": responses[0].json(),
+#             "assignments": responses[1].json(),
+#             "attendance": responses[2].json(),
+#             "non_academic": responses[3].json()
+#         }
+
+#-----------------End of Student Dashboard Routes------------------
+
+
+#-----------------Teacher Dashboard Routes------------------
+async def get_teacher_assignments(teacher_id: str):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{DASHBOARD_SERVICE_URL}/teacher/{teacher_id}/assignments")
+        response.raise_for_status()
+        return response.json()
+
+
+async def get_exam_marks(class_id: str, exam_year: str):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{DASHBOARD_SERVICE_URL}/teacher/{class_id}/{exam_year}/exam-marks")
+        response.raise_for_status()
+        return response.json()
+
+
+async def get_student_progress_teacher(class_id: str):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{DASHBOARD_SERVICE_URL}/teacher/{class_id}/student_progress")
+        response.raise_for_status()
+        return response.json()
+
+async def get_weekly_attendance(class_id: str, year: int, week_num: int):
+    async with httpx.AsyncClient() as client:
+        # Pass query parameters in the URL
+        response = await client.get(
+            f"{DASHBOARD_SERVICE_URL}/teacher/weekly_attendance",
+            params={"class_id": class_id, "year": year, "week_num": week_num}
+        )
+        response.raise_for_status()
+        return response.json()
+#-----------------End of Teacher Dashboard Routes------------------
+
+#-----------------Admin Dashboard Routes------------------
+async def get_all_users(search_with_id: str = None, role: str = None, class_id: str = None):
+    params = {}
+    if search_with_id:
+        params["search_with_id"] = search_with_id
+    if role:
+        params["role"] = role
+    if class_id:
+        params["class_id"] = class_id
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{DASHBOARD_SERVICE_URL}/admin/user_data", params=params)
+        response.raise_for_status()
+        return response.json()
+
+async def get_stats():
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{DASHBOARD_SERVICE_URL}/admin/stats")
+        response.raise_for_status()
+        return response.json()
+    
+async def get_exam_marks_admin(class_id: str, exam_year: str):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{DASHBOARD_SERVICE_URL}/admin/{class_id}/{exam_year}/exam-marks")
+        response.raise_for_status()
+        return response.json()
+
+
+async def get_student_progress_admin(class_id: str):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{DASHBOARD_SERVICE_URL}/admin/{class_id}/student_progress")
+        response.raise_for_status()
+        return response.json()
+
+async def get_weekly_attendance_admin(class_id: str, year: int, week_num: int):
+    async with httpx.AsyncClient() as client:
+        # Pass query parameters in the URL
+        response = await client.get(
+            f"{DASHBOARD_SERVICE_URL}/admin/weekly_attendance",
+            params={"class_id": class_id, "year": year, "week_num": week_num}
+        )
+        response.raise_for_status()
+        return response.json()
+#-----------------End of Admin Dashboard Routes------------------

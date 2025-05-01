@@ -79,9 +79,6 @@ async def get_subjectNclass(teacher_id: str):
     return SubjectClassResponse(subjects=subjects, classes=classes)
 
 
-
-
-
 @router.post("/assignmentcreate/{class_id}/{subject_id}/{teacher_id}", response_model=AssignmentResponse)
 async def create_assignment(
     class_id: str,

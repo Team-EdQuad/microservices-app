@@ -177,7 +177,9 @@ async def upload_content(
 
     return ContentUploadResponse(**content_data)
 
-@router.post("/submission_view/{teacher_id}", response_model=List[SubmissionResponse])
+
+##view submissions 
+@router.get("/submission_view/{teacher_id}", response_model=List[SubmissionResponse])
 async def view_manual_submission(teacher_id: str):
     teacher_data = db["teacher"].find_one({"teacher_id": teacher_id})
     if not teacher_data:

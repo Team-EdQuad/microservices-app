@@ -127,15 +127,23 @@ async def update_submission_marks(
 
 @app.post("/api/update_exam_marks")
 async def update_exam_marks(
+    teacher_id: str = Form(...),
     student_id: str = Form(...),
-    subject_id: str = Form(...),
-    exam_type: str = Form(...),
-    marks: float = Form(...)
+    exam_year: int = Form(...),
+    subject_name: str = Form(...),  # Only send name
+    term: int = Form(...),
+    marks: float = Form(...),
 ):
+    exam_type = f"Term {term}"
+
     form_data = {
+        "teacher_id": teacher_id,
         "student_id": student_id,
-        "subject_id": subject_id,
+        "exam_year": exam_year,
+        "subject_name": subject_name,  # Let academic service resolve subject_id
+        "term": term,
         "exam_type": exam_type,
         "marks": marks
     }
+
     return await add_exam_marks_request(form_data)

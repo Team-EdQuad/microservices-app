@@ -30,3 +30,5 @@ Thumbs.db
 # VSCode / JetBrains / IDE files
 .vscode/
 .idea/
+
+services/academic/uploads/*

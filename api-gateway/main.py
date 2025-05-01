@@ -42,6 +42,7 @@ async def get_assignment_details(assignment_id: str):
         raise HTTPException(status_code=404, detail="Assignment not found")
     return assignment
 
+
 @app.get("/api/assignmentmarks/{student_id}")
 async def fetch_assignment_marks(student_id: str):
     marks = await get_assignment_marks(student_id)

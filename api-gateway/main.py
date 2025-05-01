@@ -4,7 +4,7 @@ import os
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'services')))
 
-
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 #from services.nonacademic import get_all_sports, create_sport, get_all_clubs, create_club, filter_sports
 
@@ -13,6 +13,16 @@ from fastapi.responses import JSONResponse
 from typing import List, Optional
 from services.academic import create_assignment_request,upload_content_request,view_ungraded_manual_submissions,update_manual_marks,add_exam_marks_request,get_subject_names,get_student_content,get_all_assignments,get_assignment_by_id,get_assignment_marks,get_exam_marks, upload_assignment_file ,mark_content_done,get_subject_and_class_for_teacher
 app = FastAPI(title="Microservices API Gateway") 
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # React app URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.get("/api/subject/{student_id}", response_model=List)
 async def get_subjects(student_id: str):

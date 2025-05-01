@@ -124,7 +124,6 @@ async def get_subject_and_class_for_teacher(teacher_id: str):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Error fetching subject/class: {str(exc)}")
 
-
 async def create_assignment_request(class_id: str, subject_id: str, teacher_id: str, form_data: dict, file: UploadFile):
     try:
         async with httpx.AsyncClient() as client:
@@ -139,13 +138,16 @@ async def create_assignment_request(class_id: str, subject_id: str, teacher_id: 
                 data["sample_answer"] = form_data.get("sample_answer", "")
 
             files = {"file": (file.filename, await file.read(), file.content_type)}
+
             response = await client.post(url, data=data, files=files)
             response.raise_for_status()
             return response.json()
     except httpx.HTTPStatusError as exc:
+        # Show the backend error for debugging
+        print("Backend error:", exc.response.text)
         raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error creating assignment: {str(exc)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(exc)}")
 
 
 async def upload_content_request(class_id: str, subject_id: str, content_name: str, description: str, file: UploadFile):

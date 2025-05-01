@@ -78,7 +78,6 @@ async def mark_content_completed(content_id: str):
 @app.get("/api/subjectNclass/{teacher_id}")
 async def get_subject_and_class(teacher_id: str):
     return await get_subject_and_class_for_teacher(teacher_id)
-
 @app.post("/api/assignmentcreate/{class_id}/{subject_id}/{teacher_id}")
 async def create_assignment(
     class_id: str,
@@ -86,7 +85,7 @@ async def create_assignment(
     teacher_id: str,
     assignment_name: str = Form(...),
     description: str = Form(...),
-    deadline: str = Form(...),
+    deadline: str = Form(...),  # Should be in ISO format!
     grading_type: str = Form(...),
     sample_answer: Optional[str] = Form(None),
     file: UploadFile = File(...)
@@ -98,6 +97,7 @@ async def create_assignment(
         "grading_type": grading_type,
         "sample_answer": sample_answer
     }
+
     return await create_assignment_request(class_id, subject_id, teacher_id, form_data, file)
 
 @app.post("/api/contentupload/{class_id}/{subject_id}")

@@ -79,7 +79,9 @@ async def get_subjectNclass(teacher_id: str):
     return SubjectClassResponse(subjects=subjects, classes=classes)
 
 
-#asssignment create ( teacher )
+
+
+
 @router.post("/assignmentcreate/{class_id}/{subject_id}/{teacher_id}", response_model=AssignmentResponse)
 async def create_assignment(
     class_id: str,
@@ -88,31 +90,38 @@ async def create_assignment(
     assignment_name: str = Form(...),
     description: str = Form(...),
     deadline: str = Form(...),  # ISO format string
-    grading_type: str = Form(...),  # "manual" or "auto"
-    sample_answer: str = Form(None),  # Required if grading_type is "auto"
+    grading_type: str = Form(...),
+    sample_answer: str = Form(None),
     file: UploadFile = File(...)
 ):
-    # Validate grading type
+    # ✅ Validate grading type
     if grading_type == "auto" and not sample_answer:
         raise HTTPException(status_code=400, detail="Sample answer is required for auto grading.")
 
-    # Generate unique assignment ID
+    # ✅ Generate ID and file path
     assignment_id = f"ASM{uuid.uuid4().hex[:6].upper()}"
-
-    # Create file path
     file_name = f"{assignment_id}_{file.filename}"
+
+    # ✅ Ensure directory exists
+    os.makedirs(ASSIGNMENT_DIR, exist_ok=True)
     file_path = os.path.join(ASSIGNMENT_DIR, file_name)
 
-    # Save file
+    # ✅ Save uploaded file
     with open(file_path, "wb") as f:
         f.write(await file.read())
 
-    # Create assignment record
+    # ✅ Convert deadline safely
+    try:
+        deadline_dt = datetime.fromisoformat(deadline)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid deadline format. Use ISO format (e.g., 2025-04-30T23:59:00)")
+
+    # ✅ Insert data
     assignment_data = {
         "assignment_id": assignment_id,
         "assignment_name": assignment_name,
         "description": description,
-        "deadline": datetime.fromisoformat(deadline),
+        "deadline": deadline_dt,
         "assignment_file_path": file_path,
         "class_id": class_id,
         "subject_id": subject_id,
@@ -121,10 +130,16 @@ async def create_assignment(
         "sample_answer": sample_answer if grading_type == "auto" else None
     }
 
-    # Insert into MongoDB
     db["assignment"].insert_one(assignment_data)
-
     return AssignmentResponse(**assignment_data)
+
+
+
+
+
+
+
+
 
 #upload content
 @router.post("/contentupload/{class_id}/{subject_id}", response_model=ContentUploadResponse)
@@ -340,6 +355,59 @@ async def add_exam_marks(
 
     return {"detail": message}
 
+
+
+
+
+
+
+
+# #asssignment create ( teacher )
+# @router.post("/assignmentcreate/{class_id}/{subject_id}/{teacher_id}", response_model=AssignmentResponse)
+# async def create_assignment(
+#     class_id: str,
+#     subject_id: str,
+#     teacher_id: str,
+#     assignment_name: str = Form(...),
+#     description: str = Form(...),
+#     deadline: str = Form(...),  # ISO format string
+#     grading_type: str = Form(...),  # "manual" or "auto"
+#     sample_answer: str = Form(None),  # Required if grading_type is "auto"
+#     file: UploadFile = File(...)
+# ):
+#     # Validate grading type
+#     if grading_type == "auto" and not sample_answer:
+#         raise HTTPException(status_code=400, detail="Sample answer is required for auto grading.")
+
+#     # Generate unique assignment ID
+#     assignment_id = f"ASM{uuid.uuid4().hex[:6].upper()}"
+
+#     # Create file path
+#     file_name = f"{assignment_id}_{file.filename}"
+#     file_path = os.path.join(ASSIGNMENT_DIR, file_name)
+
+#     # Save file
+#     with open(file_path, "wb") as f:
+#         f.write(await file.read())
+
+#     # Create assignment record
+#     assignment_data = {
+#         "assignment_id": assignment_id,
+#         "assignment_name": assignment_name,
+#         "description": description,
+#         "deadline": datetime.fromisoformat(deadline),
+#         "assignment_file_path": file_path,
+#         "class_id": class_id,
+#         "subject_id": subject_id,
+#         "teacher_id": teacher_id,
+#         "grading_type": grading_type,
+#         "sample_answer": sample_answer if grading_type == "auto" else None
+#     }
+
+#     # Insert into MongoDB
+#     db["assignment"].insert_one(assignment_data)
+
+#     return AssignmentResponse(**assignment_data)
 
 
 

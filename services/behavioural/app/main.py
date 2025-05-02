@@ -11,6 +11,8 @@ app = FastAPI(title="Behaviral analysis API")
 router = APIRouter()
 
 
+
+
 @app.get("/")
 async def homepage():
     return {"message": "Welcome to the Behaviral analysis API"}

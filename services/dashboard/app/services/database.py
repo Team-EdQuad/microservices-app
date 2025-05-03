@@ -20,7 +20,7 @@ student_content_table = db["student_content"]
 assignment_table = db["assignment"]
 submission_table = db["submission"] 
 # academic_attendance_table = db["academic_attendance"]
-academic_attendance_table = db["attendance_store"]
+academic_attendance_table = db["attendance_store_test"]
 non_academic_attendance_table = db["non_academic_attendance"]
 exam_table = db["exam_marks"]
 

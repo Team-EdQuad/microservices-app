@@ -170,14 +170,18 @@ async def get_academic_attendance_rate(student_id: str, class_id: str):
         present_days = 0
         for record in academic_attendance:
             record_date = datetime.strptime(record["date"], "%Y-%m-%d")
-            if record_date.year == datetime.now().year:
+            if record_date.year == datetime.now().year and record['subject_id'] == "academic":
+                print(record['subject_id'])
                 total_days += 1
-                
-                for attendance_status in record["status"]:
-                    if attendance_status["student_id"] == student_id:
-                        if attendance_status["status"]:
-                            present_days += 1
-                        break
+                # for attendance_status in record["status"]:
+                #     if attendance_status["student_id"] == student_id:
+                #         if attendance_status["status"]:
+                #             present_days += 1
+                #         break
+
+                if student_id in record["status"]:
+                    if record["status"][student_id] == "present":
+                        present_days += 1
 
         if total_days == 0:
             raise HTTPException(status_code=404, detail=f"No attendance records found for student ")
@@ -194,15 +198,17 @@ async def get_academic_attendance_rate(student_id: str, class_id: str):
         raise HTTPException(status_code=500, detail=f"Error retrieving academic attendance rate: {str(e)}")
 
 
-@student_dashboard_router.get("/{student_id}/{class_id}/{exam_year}/exam-marks", response_model=List[ExamMarksResponse])
-async def get_student_exam_marks(student_id: str, class_id: str, exam_year: int):
+@student_dashboard_router.get("/{student_id}/{class_id}/exam-marks", response_model=List[ExamMarksResponse])
+async def get_student_exam_marks(student_id: str, class_id: str, exam_year: int = None):
+    if not exam_year:
+        exam_year = datetime.now().year - 1 
+
     student_exam_marks = exam_table.find_one({"student_id": student_id, "exam_year": exam_year, "class_id": class_id})
     
     if not student_exam_marks:
         raise HTTPException(status_code=404, detail="Student exam records not found")
 
     flattened_data = []
-    
     for subject in student_exam_marks.get("exam_marks", []):
         subject_id = subject["subject_id"]
         subject_data = subject_table.find_one({"subject_id": subject_id})
@@ -227,15 +233,18 @@ async def get_monthly_attendance_rate(student_id: str, class_id: str):
         for record in academic_attendance:
             record_date = datetime.strptime(record["date"], "%Y-%m-%d")
 
-            if record_date.year == datetime.now().year:
+            if record_date.year == datetime.now().year and record['subject_id'] == "academic":
                 month = record_date.strftime("%B")
                 monthly_attendance[month]["total_days"] += 1
 
-                for attendance_status in record["status"]:
-                    if attendance_status["student_id"] == student_id:
-                        if attendance_status["status"]:
-                            monthly_attendance[month]["present_days"] += 1
-                        break
+                # for attendance_status in record["status"]:
+                #     if attendance_status["student_id"] == student_id:
+                #         if attendance_status["status"]:
+                #             monthly_attendance[month]["present_days"] += 1
+                #         break
+                if student_id in record["status"]:
+                    if record["status"][student_id] == "present":
+                        monthly_attendance[month]["present_days"] += 1
 
         if not monthly_attendance:
             raise HTTPException(status_code=404, detail="No attendance records found.")
@@ -268,17 +277,15 @@ async def get_weekly_attendance_rate(student_id: str, class_id: str):
 
         for record in attendance_records:
             record_date = datetime.strptime(record["date"], "%Y-%m-%d")
-
-            if record_date.year == datetime.now().year:
+            
+            if record_date.year == datetime.now().year and record['subject_id'] == "academic":
                 weekday = record["weekday"]
 
                 weekly_attendance[weekday]["total_days"] += 1
 
-                for attendance_status in record["status"]:
-                    if attendance_status["student_id"] == student_id:
-                        if attendance_status["status"]:
-                            weekly_attendance[weekday]["present_days"] += 1
-                        break
+                if student_id in record["status"]:
+                    if record["status"][student_id] == "present":
+                        weekly_attendance[weekday]["present_days"] += 1
 
         if not weekly_attendance:
             raise HTTPException(status_code=404, detail="No attendance records found.")

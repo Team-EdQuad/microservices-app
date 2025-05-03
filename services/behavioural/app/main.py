@@ -9,6 +9,7 @@ from .services.database import db
 app = FastAPI(title="Behavioral Analysis API")
 router = APIRouter()
 
+
 def get_current_week_range():
     """Returns a hardcoded date range for testing (May 2025)."""
     start = datetime(2025, 5, 1)  # May 1, 2025 (Monday)
@@ -75,6 +76,8 @@ async def get_avg_time_spent(subject_id: str, class_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
+
+# Endpoint to get resource access frequency
 @router.get("/ResourceAccessFrequency/{subject_id}/{class_id}")
 async def get_resource_access_frequency(subject_id: str, class_id: str):
     """
@@ -145,6 +148,70 @@ async def get_resource_access_frequency(subject_id: str, class_id: str):
             "totalAccessCount": total_access_count,
             "uniqueStudents": unique_students
         }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+
+
+# Endpoint to calculate site average active time
+@router.get("/SiteAverageActiveTime/{subject_id}/{class_id}")
+async def get_site_average_active_time(subject_id: str, class_id: str):
+    """
+    Calculates the average site active time per session (in minutes)
+    for a given subject and class within the current week.
+    """
+    start_date, end_date = get_current_week_range()
+
+    pipeline = [
+        {
+            "$match": {
+                "subjectId": subject_id,
+                "classId": class_id,
+                "loginTime": {
+                    "$gte": start_date,
+                    "$lt": end_date
+                },
+                "logoutTime": { "$exists": True, "$ne": None }
+            }
+        },
+        {
+            "$project": {
+                "activeMinutes": {
+                    "$divide": [
+                        {
+                            "$subtract": [
+                                { "$toDate": "$logoutTime" },  # Convert logoutTime from string to Date
+                                { "$toDate": "$loginTime" }    # Convert loginTime from string to Date
+                            ]
+                        },
+                        1000 * 60  # Convert milliseconds to minutes
+                    ]
+                }
+            }
+        },
+        {
+            "$group": {
+                "_id": None,
+                "siteAverageActiveTime": { "$avg": "$activeMinutes" },
+                "sessionCount": { "$sum": 1 }
+            }
+        },
+        {
+            "$project": {
+                "_id": 0,
+                "siteAverageActiveTime": { "$round": ["$siteAverageActiveTime", 2] },
+                "sessionCount": 1
+            }
+        }
+    ]
+
+    try:
+        result = list(db["site_activity_logs"].aggregate(pipeline))
+
+        if not result:
+            raise HTTPException(status_code=404, detail="No site activity data found for this subject and class this week.")
+
+        return result[0]
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")

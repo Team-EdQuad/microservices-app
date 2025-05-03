@@ -75,6 +75,81 @@ async def get_avg_time_spent(subject_id: str, class_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
+@router.get("/ResourceAccessFrequency/{subject_id}/{class_id}")
+async def get_resource_access_frequency(subject_id: str, class_id: str):
+    """
+    Returns:
+    - Access count per student
+    - Access count per content
+    - Total access count and unique students
+    """
+    start_date, end_date = get_current_week_range()
+
+    try:
+        collection = db["behavioral_analysis"]
+
+        # Group by student
+        student_pipeline = [
+            {
+                "$match": {
+                    "subjectId": subject_id,
+                    "classId": class_id,
+                    "accessBeginTime": { "$gte": start_date, "$lt": end_date },
+                    "accessCount": { "$exists": True, "$ne": None }
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$studentId",
+                    "accessCount": { "$sum": "$accessCount" }
+                }
+            }
+        ]
+
+        # Group by content
+        content_pipeline = [
+            {
+                "$match": {
+                    "subjectId": subject_id,
+                    "classId": class_id,
+                    "accessBeginTime": { "$gte": start_date, "$lt": end_date },
+                    "accessCount": { "$exists": True, "$ne": None }
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$contentId",
+                    "accessCount": { "$sum": "$accessCount" }
+                }
+            }
+        ]
+
+        student_accesses = list(collection.aggregate(student_pipeline))
+        content_accesses = list(collection.aggregate(content_pipeline))
+
+        if not student_accesses and not content_accesses:
+            raise HTTPException(status_code=404, detail="No access data found for the given subject and class this week.")
+
+        total_access_count = sum([s["accessCount"] for s in student_accesses])
+        unique_students = len(student_accesses)
+
+        return {
+            "studentAccesses": [
+                { "studentId": s["_id"], "accessCount": s["accessCount"] }
+                for s in student_accesses
+            ],
+            "contentAccesses": [
+                { "contentId": c["_id"], "accessCount": c["accessCount"] }
+                for c in content_accesses
+            ],
+            "totalAccessCount": total_access_count,
+            "uniqueStudents": unique_students
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+
+
 
 # Include the router
 app.include_router(router)

@@ -128,7 +128,7 @@ async def create_assignment(
         "teacher_id": teacher_id,
         "grading_type": grading_type,
         "sample_answer": sample_answer if grading_type == "auto" else None,
-        "created_at": created_at  # <-- 🕒 Added timestamp
+        "created_at": datetime.utcnow()
     }
 
     db["assignment"].insert_one(assignment_data)

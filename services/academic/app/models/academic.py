@@ -55,15 +55,14 @@ class SubmissionResponse(BaseModel):
     teacher_id: str
 
 
-
-# Response model for each assignment
-class AssignmentBrief(BaseModel):
+class AssignmentItem(BaseModel):
     assignment_id: str
     assignment_name: str
+    created_at: datetime 
 
 # List response
 class AssignmentListResponse(BaseModel):
-    assignments: List[AssignmentBrief]
+    assignments: List[AssignmentItem]
 
 
 

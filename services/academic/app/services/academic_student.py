@@ -110,8 +110,6 @@ async def get_content(student_id: str, subject_id: str):
     return content_list
 
 
-
-#view all available assignments
 @router.get("/show_assignments/{student_id}/{subject_id}", response_model=AssignmentListResponse)
 async def show_assignments(student_id: str, subject_id: str):
     # Step 1: Get student's class_id
@@ -125,10 +123,10 @@ async def show_assignments(student_id: str, subject_id: str):
     if not class_id:
         raise HTTPException(status_code=404, detail="No class ID associated with this student")
 
-    # Step 2: Fetch all assignments that match class_id and subject_id
+    # Step 2: Fetch all assignments with created_at
     assignments_cursor = db["assignment"].find(
         {"class_id": class_id, "subject_id": subject_id},
-        {"_id": 0, "assignment_id": 1, "assignment_name": 1}
+        {"_id": 0, "assignment_id": 1, "assignment_name": 1, "created_at": 1}
     )
 
     assignments = list(assignments_cursor)
@@ -136,7 +134,6 @@ async def show_assignments(student_id: str, subject_id: str):
     if not assignments:
         raise HTTPException(status_code=404, detail="No assignments found for this subject and class")
 
-    # Step 3: Format and return the list
     return AssignmentListResponse(assignments=assignments)
 
 

@@ -113,6 +113,9 @@ async def create_assignment(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid deadline format. Use ISO format (e.g., 2025-04-30T23:59:00)")
 
+    # ✅ Get current UTC time for upload timestamp
+    created_at = datetime.utcnow()
+
     # ✅ Insert data
     assignment_data = {
         "assignment_id": assignment_id,
@@ -124,14 +127,12 @@ async def create_assignment(
         "subject_id": subject_id,
         "teacher_id": teacher_id,
         "grading_type": grading_type,
-        "sample_answer": sample_answer if grading_type == "auto" else None
+        "sample_answer": sample_answer if grading_type == "auto" else None,
+        "created_at": created_at  # <-- 🕒 Added timestamp
     }
 
     db["assignment"].insert_one(assignment_data)
     return AssignmentResponse(**assignment_data)
-
-
-
 
 
 

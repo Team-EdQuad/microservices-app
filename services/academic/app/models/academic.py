@@ -92,6 +92,7 @@ class AssignmentResponse(BaseModel):
     teacher_id: str
     grading_type: str
     sample_answer: Optional[str] = None
+    created_at: datetime 
 
 
 #student  view assignment marks

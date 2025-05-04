@@ -10,6 +10,7 @@ from ..utils.grading import grade_answer
 
 
 
+
 UPLOAD_DIR = "uploads/submissions"
 os.makedirs(UPLOAD_DIR, exist_ok=True) 
 
@@ -77,23 +78,22 @@ async def get_content(student_id: str, subject_id: str):
     content_list = []
     for content in content_cursor:
         try:
-            # Handle Date field
-            if "Date" in content:
-                if isinstance(content["Date"], str):
+            upload_date = content.get("upload_date")
+            if isinstance(upload_date, str):
+                try:
+                    upload_date = datetime.fromisoformat(upload_date)
+                except ValueError:
                     try:
-                        content["Date"] = datetime.fromisoformat(content["Date"])
+                        upload_date = datetime.strptime(upload_date, "%Y-%m-%d")
                     except ValueError:
-                        try:
-                            content["Date"] = datetime.strptime(content["Date"], "%Y-%m-%d")
-                        except ValueError:
-                            content["Date"] = None
-            
+                        upload_date = None
+                        
             # Create a ContentResponse object
             content_response = ContentResponse(
                 content_id=content.get("content_id"),
                 content_name=content.get("content_name"),
                 content_file_path=content.get("content_file_path"),
-                Date=content.get("Date"),
+                Date=upload_date,
                 description=content.get("description"),
                 class_id=content.get("class_id"),
                 subject_id=content.get("subject_id", "")  

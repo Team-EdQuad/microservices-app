@@ -10,7 +10,7 @@ app = FastAPI(title="Behavioral Analysis API")
 router = APIRouter()
 collection = db["behavioral_analysis"]
 
-# Helper to get current week (hardcoded for test)
+# Helper to get current week (hardcoded for test) ###------must update to get current week------###
 def get_current_week_range():
     start = datetime(2025, 5, 1)
     end = start + timedelta(days=7)
@@ -74,56 +74,6 @@ async def get_avg_time_spent(subject_id: str, class_id: str):
 
 
 
-# @router.get("/TimeSpendOnResources/{subject_id}/{class_id}")
-# async def get_avg_time_spent(subject_id: str, class_id: str):
-#     start_date, end_date = get_current_week_range()
-
-#     pipeline = [
-#         {
-#             "$match": {
-#                 "subject_id": subject_id,  
-#                 "class_id": class_id,      
-#                 "accessBeginTime": {
-#                     "$gte": start_date,
-#                     "$lt": end_date
-#                 },
-#                 "durationMinutes": { "$exists": True, "$ne": None }
-#             }
-#         },
-#         {
-#             "$group": {
-#                 "_id": "$student_id",  
-#                 "totalDuration": { "$sum": "$durationMinutes" }
-#             }
-#         },
-#         {
-#             "$group": {
-#                 "_id": None,
-#                 "avgDuration": { "$avg": "$totalDuration" },
-#                 "studentCount": { "$sum": 1 }
-#             }
-#         },
-#         {
-#             "$project": {
-#                 "_id": 0,
-#                 "avgTimeSpentPerStudent": "$avgDuration",
-#                 "totalStudents": "$studentCount"
-#             }
-#         }
-#     ]
-    
-#     try:
-#         result = list(db["behavioral_analysis"].aggregate(pipeline))
-        
-#         if not result:
-#             raise HTTPException(status_code=404, detail="No data found for the given subject and class this week.")
-        
-#         return result[0]
-    
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
-
-
 @router.get("/SiteAverageActiveTime/{subject_id}/{class_id}")
 async def get_site_average_active_time(subject_id: str, class_id: str):
     start_date, end_date = get_current_week_range()
@@ -131,8 +81,8 @@ async def get_site_average_active_time(subject_id: str, class_id: str):
     pipeline = [
         {
             "$match": {
-                "subject_id": subject_id,  # Updated to snake_case
-                "class_id": class_id,      # Updated to snake_case
+                "subject_id": subject_id, 
+                "class_id": class_id,     
                 "loginTime": {
                     "$gte": start_date,
                     "$lt": end_date

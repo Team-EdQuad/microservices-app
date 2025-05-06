@@ -32,3 +32,5 @@ Thumbs.db
 .idea/
 
 services/academic/uploads/*
+
+services/behavioural/delete code lines.txt

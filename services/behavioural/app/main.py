@@ -73,64 +73,134 @@ async def get_avg_time_spent(subject_id: str, class_id: str):
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 
+@router.get("/SiteAverageActiveTime/{class_id}")
+async def get_site_average_active_time(class_id: str):
+    try:
+        # Step 1: Get list of student_ids in the class
+        students = list(db["student"].find({"class_id": class_id}))
 
-@router.get("/SiteAverageActiveTime/{subject_id}/{class_id}")
-async def get_site_average_active_time(subject_id: str, class_id: str):
-    start_date, end_date = get_current_week_range()
+        student_ids = [student["student_id"] for student in students]
+        total_students = len(student_ids)
 
-    pipeline = [
-        {
-            "$match": {
-                "subject_id": subject_id, 
-                "class_id": class_id,     
-                "loginTime": {
-                    "$gte": start_date,
-                    "$lt": end_date
-                },
-                "logoutTime": { "$exists": True, "$ne": None }
-            }
-        },
-        {
-            "$project": {
-                "activeMinutes": {
-                    "$divide": [
-                        {
-                            "$subtract": [
-                                { "$toDate": "$logoutTime" },
-                                { "$toDate": "$loginTime" }
-                            ]
-                        },
-                        1000 * 60  # Convert milliseconds to minutes
-                    ]
+        if total_students == 0:
+            raise HTTPException(status_code=404, detail="No students found for this class.")
+
+        # Step 2: Define week range
+        start_date, end_date = get_current_week_range()
+
+        # Step 3: Aggregate total active time per student
+        pipeline = [
+            {
+                "$match": {
+                    "class_id": class_id,
+                    "student_id": {"$in": student_ids},
+                    "loginTime": {"$gte": start_date, "$lt": end_date},
+                    "logoutTime": {"$exists": True, "$ne": None}
+                }
+            },
+            {
+                "$project": {
+                    "student_id": 1,
+                    "activeMinutes": {
+                        "$divide": [
+                            {"$subtract": [
+                                {"$toDate": "$logoutTime"},
+                                {"$toDate": "$loginTime"}
+                            ]},
+                            1000 * 60  # Convert ms to minutes
+                        ]
+                    }
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$student_id",
+                    "totalActiveMinutes": {"$sum": "$activeMinutes"}
                 }
             }
-        },
-        {
-            "$group": {
-                "_id": None,
-                "siteAverageActiveTime": { "$avg": "$activeMinutes" },
-                "sessionCount": { "$sum": 1 }
-            }
-        },
-        {
-            "$project": {
-                "_id": 0,
-                "siteAverageActiveTime": { "$round": ["$siteAverageActiveTime", 2] },
-                "sessionCount": 1
-            }
-        }
-    ]
-    
-    try:
+        ]
+
         result = list(db["site_activity_logs"].aggregate(pipeline))
-        
-        if not result:
-            raise HTTPException(status_code=404, detail="No site activity data found for this subject and class this week.")
-        
-        return result[0]
-    
+
+        # Step 4: Build a map of active minutes per student
+        active_map = {r["_id"]: r["totalActiveMinutes"] for r in result}
+
+        # Step 5: Sum total minutes, fill 0 for students with no logins
+        total_active_time = 0
+        for sid in student_ids:
+            total_active_time += active_map.get(sid, 0)
+
+        # Step 6: Calculate average
+        average_active_time = round(total_active_time / total_students, 2)
+
+        return {
+            "siteAverageActiveTimePerStudent": average_active_time,
+            "totalStudents": total_students
+        }
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+
+
+
+
+# @router.get("/SiteAverageActiveTime/{subject_id}/{class_id}")
+# async def get_site_average_active_time(subject_id: str, class_id: str):
+#     start_date, end_date = get_current_week_range()
+
+#     pipeline = [
+#         {
+#             "$match": {
+#                 "subject_id": subject_id, 
+#                 "class_id": class_id,     
+#                 "loginTime": {
+#                     "$gte": start_date,
+#                     "$lt": end_date
+#                 },
+#                 "logoutTime": { "$exists": True, "$ne": None }
+#             }
+#         },
+#         {
+#             "$project": {
+#                 "activeMinutes": {
+#                     "$divide": [
+#                         {
+#                             "$subtract": [
+#                                 { "$toDate": "$logoutTime" },
+#                                 { "$toDate": "$loginTime" }
+#                             ]
+#                         },
+#                         1000 * 60  # Convert milliseconds to minutes
+#                     ]
+#                 }
+#             }
+#         },
+#         {
+#             "$group": {
+#                 "_id": None,
+#                 "siteAverageActiveTime": { "$avg": "$activeMinutes" },
+#                 "sessionCount": { "$sum": 1 }
+#             }
+#         },
+#         {
+#             "$project": {
+#                 "_id": 0,
+#                 "siteAverageActiveTime": { "$round": ["$siteAverageActiveTime", 2] },
+#                 "sessionCount": 1
+#             }
+#         }
+#     ]
+    
+#     try:
+#         result = list(db["site_activity_logs"].aggregate(pipeline))
+        
+#         if not result:
+#             raise HTTPException(status_code=404, detail="No site activity data found for this subject and class this week.")
+        
+#         return result[0]
+    
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 
 

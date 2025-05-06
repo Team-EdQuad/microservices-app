@@ -10,11 +10,22 @@ app = FastAPI(title="Behavioral Analysis API")
 router = APIRouter()
 collection = db["behavioral_analysis"]
 
-# Helper to get current week (hardcoded for test) ###------must update to get current week------###
+
+
+
 def get_current_week_range():
-    start = datetime(2025, 5, 1)
-    end = start + timedelta(days=7)
-    return start.isoformat() + "Z", end.isoformat() + "Z"
+    today = datetime.utcnow()
+    start_of_week = today - timedelta(days=today.weekday())  # Monday
+    end_of_week = start_of_week + timedelta(days=7)          # Next Monday (exclusive end)
+    
+    return start_of_week.isoformat() + "Z", end_of_week.isoformat() + "Z"
+
+
+
+# def get_current_week_range():
+#     start = datetime(2025, 5, 1)
+#     end = start + timedelta(days=7)
+#     return start.isoformat() + "Z", end.isoformat() + "Z"
 
 @router.get("/TimeSpendOnResources/{subject_id}/{class_id}")
 async def get_avg_time_spent(subject_id: str, class_id: str):
@@ -142,114 +153,59 @@ async def get_site_average_active_time(class_id: str):
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 
-
-
-# @router.get("/SiteAverageActiveTime/{subject_id}/{class_id}")
-# async def get_site_average_active_time(subject_id: str, class_id: str):
-#     start_date, end_date = get_current_week_range()
-
-#     pipeline = [
-#         {
-#             "$match": {
-#                 "subject_id": subject_id, 
-#                 "class_id": class_id,     
-#                 "loginTime": {
-#                     "$gte": start_date,
-#                     "$lt": end_date
-#                 },
-#                 "logoutTime": { "$exists": True, "$ne": None }
-#             }
-#         },
-#         {
-#             "$project": {
-#                 "activeMinutes": {
-#                     "$divide": [
-#                         {
-#                             "$subtract": [
-#                                 { "$toDate": "$logoutTime" },
-#                                 { "$toDate": "$loginTime" }
-#                             ]
-#                         },
-#                         1000 * 60  # Convert milliseconds to minutes
-#                     ]
-#                 }
-#             }
-#         },
-#         {
-#             "$group": {
-#                 "_id": None,
-#                 "siteAverageActiveTime": { "$avg": "$activeMinutes" },
-#                 "sessionCount": { "$sum": 1 }
-#             }
-#         },
-#         {
-#             "$project": {
-#                 "_id": 0,
-#                 "siteAverageActiveTime": { "$round": ["$siteAverageActiveTime", 2] },
-#                 "sessionCount": 1
-#             }
-#         }
-#     ]
-    
-#     try:
-#         result = list(db["site_activity_logs"].aggregate(pipeline))
-        
-#         if not result:
-#             raise HTTPException(status_code=404, detail="No site activity data found for this subject and class this week.")
-        
-#         return result[0]
-    
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
-
-
-
-
-# Endpoint to get resource access frequency
 @router.get("/ResourceAccessFrequency/{subject_id}/{class_id}")
 async def get_resource_access_frequency(subject_id: str, class_id: str):
     """
     Returns:
     - Access count per student
     - Access count per content
-    - Total access count and unique students
+    - Total access count
+    - Unique students (who accessed)
+    - Average access per student (based on total class strength)
     """
     start_date, end_date = get_current_week_range()
 
     try:
         collection = db["behavioral_analysis"]
 
-        # Group by student
+        # 1. Get total number of students in the class
+        students = list(db["student"].find({"class_id": class_id}))
+        total_students = len(students)
+
+        if total_students == 0:
+            raise HTTPException(status_code=404, detail="No students found in the given class.")
+
+        # 2. Group by student
         student_pipeline = [
             {
                 "$match": {
-                    "subjectId": subject_id,
-                    "classId": class_id,
+                    "subject_id": subject_id,
+                    "class_id": class_id,
                     "accessBeginTime": { "$gte": start_date, "$lt": end_date },
                     "accessCount": { "$exists": True, "$ne": None }
                 }
             },
             {
                 "$group": {
-                    "_id": "$studentId",
+                    "_id": "$student_id",
                     "accessCount": { "$sum": "$accessCount" }
                 }
             }
         ]
 
-        # Group by content
+        # 3. Group by content
         content_pipeline = [
             {
                 "$match": {
-                    "subjectId": subject_id,
-                    "classId": class_id,
+                    "subject_id": subject_id,
+                    "class_id": class_id,
                     "accessBeginTime": { "$gte": start_date, "$lt": end_date },
                     "accessCount": { "$exists": True, "$ne": None }
                 }
             },
             {
                 "$group": {
-                    "_id": "$contentId",
+                    "_id": "$content_id",
                     "accessCount": { "$sum": "$accessCount" }
                 }
             }
@@ -263,6 +219,7 @@ async def get_resource_access_frequency(subject_id: str, class_id: str):
 
         total_access_count = sum([s["accessCount"] for s in student_accesses])
         unique_students = len(student_accesses)
+        avg_access_per_student = round(total_access_count / total_students, 2)
 
         return {
             "studentAccesses": [
@@ -274,11 +231,14 @@ async def get_resource_access_frequency(subject_id: str, class_id: str):
                 for c in content_accesses
             ],
             "totalAccessCount": total_access_count,
-            "uniqueStudents": unique_students
+            "uniqueStudents": unique_students,
+            "totalStudentsInClass": total_students,
+            "avgAccessPerStudentInClass": avg_access_per_student
         }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+
 
 
 

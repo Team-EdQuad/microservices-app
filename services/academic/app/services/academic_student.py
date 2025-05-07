@@ -7,6 +7,8 @@ from ..models.academic import AssignmentListResponse, AssignmentViewResponse, Co
 from .database import db
 from ..utils.file_utils import extract_text
 from ..utils.grading import grade_answer
+from fastapi.responses import FileResponse
+
 
 
 
@@ -19,6 +21,37 @@ ALLOWED_EXTENSIONS = {"pdf", "txt"}  # Allowed file types
 
 router = APIRouter()
 
+@router.get("/content/file/{content_id}")
+async def serve_content_file(content_id: str):
+    try:
+        print(f"Looking up content_id: {content_id}")
+        content = db["content"].find_one({"content_id": content_id})
+        print(f"Content found: {content}")
+
+        if not content:
+            raise HTTPException(status_code=404, detail="Content not found")
+
+        file_path = content.get("content_file_path")
+        print(f"File path: {file_path}")
+
+        if not file_path or not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="File not found")
+
+        ext = os.path.splitext(file_path)[1].lower()
+        media_type = "application/pdf" if ext == ".pdf" else "text/plain" if ext == ".txt" else "application/octet-stream"
+
+        print(f"Serving file: {file_path}, Media type: {media_type}")
+        return FileResponse(
+            path=file_path,
+            media_type=media_type,
+            filename=os.path.basename(file_path),
+            headers={"Content-Disposition": f"inline; filename={os.path.basename(file_path)}"}
+        )
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+    
+    
 #subject interface
 @router.get("/students/{student_id}/subjects", response_model=List[SubjectResponse])
 async def get_subject_names(student_id: str):
@@ -108,6 +141,9 @@ async def get_content(student_id: str, subject_id: str):
         raise HTTPException(status_code=404, detail="No content found for this class")
     
     return content_list
+
+
+
 
 
 @router.get("/show_assignments/{student_id}/{subject_id}", response_model=AssignmentListResponse)

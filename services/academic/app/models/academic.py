@@ -74,6 +74,7 @@ class AssignmentViewResponse(BaseModel):
     Deadline: datetime
     class_id: str
     subject_id: str
+    description: Optional[str] = None
    
 
 

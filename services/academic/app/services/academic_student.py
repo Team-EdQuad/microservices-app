@@ -46,10 +46,6 @@ async def get_content_by_id(content_id: str):
         print(f"Error retrieving content metadata: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-
-
-
-
 @router.get("/content/file/{content_id}")
 async def serve_content_file(content_id: str):
     try:
@@ -80,6 +76,90 @@ async def serve_content_file(content_id: str):
         print(f"Unexpected error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
     
+
+
+
+
+@router.get("/assignment/file/{assignment_id}")
+async def serve_assignment_file(assignment_id: str):
+    try:
+        print(f"Looking up assignment_id: {assignment_id}")
+        assignment = db["assignment"].find_one({"assignment_id": assignment_id})
+        print(f"Content found: {assignment}")
+
+        if not assignment:
+            raise HTTPException(status_code=404, detail="Content not found")
+
+        file_path = assignment.get("assignment_file_path")
+        print(f"File path: {file_path}")
+
+        if not file_path or not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="File not found")
+
+        ext = os.path.splitext(file_path)[1].lower()
+        media_type = "application/pdf" if ext == ".pdf" else "text/plain" if ext == ".txt" else "application/octet-stream"
+
+        print(f"Serving file: {file_path}, Media type: {media_type}")
+        return FileResponse(
+            path=file_path,
+            media_type=media_type,
+            filename=os.path.basename(file_path),
+            headers={"Content-Disposition": f"inline; filename={os.path.basename(file_path)}"}
+        )
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+    
+
+
+#view assignment (after clicked)
+@router.get("/assignment/{assignment_id}", response_model=AssignmentViewResponse)
+async def get_assignment(assignment_id: str):
+    # Step 1: Fetch assignment by assignment_id only
+    assignment = db["assignment"].find_one(
+        {"assignment_id": assignment_id},
+        {"_id": 0}  # Exclude MongoDB internal ID
+    )
+
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    try:
+        # Step 2: Handle Deadline format
+        if "deadline" in assignment:
+            if isinstance(assignment["deadline"], str):
+                try:
+                    assignment["deadline"] = datetime.fromisoformat(assignment["deadline"])
+                except ValueError:
+                    try:
+                        assignment["deadline"] = datetime.strptime(assignment["deadline"], "%Y-%m-%d")
+                    except ValueError:
+                        assignment["deadline"] = None
+
+        # Step 3: Construct and return response
+        assignment_response = AssignmentViewResponse(
+            assignment_id=assignment.get("assignment_id"),
+            assignment_name=assignment.get("assignment_name"),
+            assignment_file_path=assignment.get("assignment_file_path"),
+            Deadline=assignment.get("deadline"),
+            class_id=assignment.get("class_id"),
+            subject_id=assignment.get("subject_id"),
+            description=assignment.get("description", None) 
+        )
+
+        return assignment_response
+
+    except Exception as e:
+        print(f"Error processing assignment: {e}")
+        raise HTTPException(status_code=500, detail="Error processing assignment data")
+
+
+
+
+
+
+
+
 
 #subject interface
 @router.get("/students/{student_id}/subjects", response_model=List[SubjectResponse])
@@ -233,7 +313,8 @@ async def get_assignment(assignment_id: str):
             assignment_file_path=assignment.get("assignment_file_path"),
             Deadline=assignment.get("deadline"),
             class_id=assignment.get("class_id"),
-            subject_id=assignment.get("subject_id")
+            subject_id=assignment.get("subject_id"),
+            description=assignment.get("description", None) 
         )
 
         return assignment_response

@@ -153,14 +153,6 @@ async def get_assignment(assignment_id: str):
         print(f"Error processing assignment: {e}")
         raise HTTPException(status_code=500, detail="Error processing assignment data")
 
-
-
-
-
-
-
-
-
 #subject interface
 @router.get("/students/{student_id}/subjects", response_model=List[SubjectResponse])
 async def get_subject_names(student_id: str):

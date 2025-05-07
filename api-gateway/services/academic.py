@@ -7,6 +7,24 @@ ACADEMIC_SERVICE_URL = "http://127.0.0.1:8002"
 
 
 
+
+async def get_content_by_id(content_id: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{ACADEMIC_SERVICE_URL}/content/{content_id}"
+            print(f"Calling URL: {url}")
+            response = await client.get(url)
+            print(f"Response Status: {response.status_code}")
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        print(f"HTTPStatusError: {exc.response.status_code}, {exc.response.text}")
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        print(f"Exception: {str(exc)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(exc)}")
+
+
 async def get_content_file_by_id(content_id: str):
     try:
         async with httpx.AsyncClient() as client:

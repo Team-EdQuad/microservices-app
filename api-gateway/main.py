@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 import httpx 
 from fastapi.responses import JSONResponse
 from typing import List, Optional
-from services.academic import get_content_file_by_id,create_assignment_request,upload_content_request,view_ungraded_manual_submissions,update_manual_marks,add_exam_marks_request,get_subject_names,get_student_content,get_all_assignments,get_assignment_by_id,get_assignment_marks,get_exam_marks, upload_assignment_file ,mark_content_done,get_subject_and_class_for_teacher
+from services.academic import  get_content_by_id,get_content_file_by_id,create_assignment_request,upload_content_request,view_ungraded_manual_submissions,update_manual_marks,add_exam_marks_request,get_subject_names,get_student_content,get_all_assignments,get_assignment_by_id,get_assignment_marks,get_exam_marks, upload_assignment_file ,mark_content_done,get_subject_and_class_for_teacher
 app = FastAPI(title="Microservices API Gateway") 
 
 
@@ -22,6 +22,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+
+
+# Add this to your main.py (port 8000)
+@app.get("/api/content/{content_id}")
+async def get_content_file(content_id: str):
+    return await get_content_by_id(content_id)
+
 
 @app.get("/api/content/file/{content_id}")
 async def get_content_file(content_id: str):

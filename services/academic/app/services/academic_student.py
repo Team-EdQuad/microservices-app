@@ -20,6 +20,35 @@ ALLOWED_EXTENSIONS = {"pdf", "txt"}  # Allowed file types
 
 
 router = APIRouter()
+@router.get("/content/{content_id}")
+async def get_content_by_id(content_id: str):
+    try:
+        print(f"Looking up metadata for content_id: {content_id}")
+        content = db["content"].find_one({"content_id": content_id})
+        
+        if not content:
+            raise HTTPException(status_code=404, detail="Content not found")
+            
+        # Convert ObjectId to string if present
+        if "_id" in content:
+            content["_id"] = str(content["_id"])
+        
+        # Format the response to match what the frontend expects
+        response = {
+            "content_id": content["content_id"],
+            "content_name": content.get("content_name", "Untitled"),
+            "description": content.get("description", ""),
+            "file_path": content.get("content_file_path", "")
+        }
+            
+        return response
+    except Exception as e:
+        print(f"Error retrieving content metadata: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+
+
 
 @router.get("/content/file/{content_id}")
 async def serve_content_file(content_id: str):
@@ -51,7 +80,7 @@ async def serve_content_file(content_id: str):
         print(f"Unexpected error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
     
-    
+
 #subject interface
 @router.get("/students/{student_id}/subjects", response_model=List[SubjectResponse])
 async def get_subject_names(student_id: str):

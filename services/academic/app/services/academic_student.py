@@ -77,9 +77,6 @@ async def serve_content_file(content_id: str):
         raise HTTPException(status_code=500, detail="Internal Server Error")
     
 
-
-
-
 @router.get("/assignment/file/{assignment_id}")
 async def serve_assignment_file(assignment_id: str):
     try:
@@ -110,7 +107,6 @@ async def serve_assignment_file(assignment_id: str):
         print(f"Unexpected error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
     
-
 
 #view assignment (after clicked)
 @router.get("/assignment/{assignment_id}", response_model=AssignmentViewResponse)
@@ -242,9 +238,6 @@ async def get_content(student_id: str, subject_id: str):
         raise HTTPException(status_code=404, detail="No content found for this class")
     
     return content_list
-
-
-
 
 
 @router.get("/show_assignments/{student_id}/{subject_id}", response_model=AssignmentListResponse)

@@ -11,8 +11,6 @@ router = APIRouter()
 collection = db["behavioral_analysis"]
 
 
-
-
 def get_current_week_range():
     today = datetime.utcnow()
     start_of_week = today - timedelta(days=today.weekday())  # Monday
@@ -20,12 +18,6 @@ def get_current_week_range():
     
     return start_of_week.isoformat() + "Z", end_of_week.isoformat() + "Z"
 
-
-
-# def get_current_week_range():
-#     start = datetime(2025, 5, 1)
-#     end = start + timedelta(days=7)
-#     return start.isoformat() + "Z", end.isoformat() + "Z"
 
 @router.get("/TimeSpendOnResources/{subject_id}/{class_id}")
 async def get_avg_time_spent(subject_id: str, class_id: str):
@@ -238,7 +230,6 @@ async def get_resource_access_frequency(subject_id: str, class_id: str):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
-
 
 
 

@@ -12,6 +12,8 @@ import httpx
 from fastapi.responses import JSONResponse
 from typing import List, Optional
 from services.academic import  get_assignment_file_by_id,get_content_by_id,get_content_file_by_id,create_assignment_request,upload_content_request,view_ungraded_manual_submissions,update_manual_marks,add_exam_marks_request,get_subject_names,get_student_content,get_all_assignments,get_assignment_by_id,get_assignment_marks,get_exam_marks, upload_assignment_file ,mark_content_done,get_subject_and_class_for_teacher
+from services.behavioural import time_spent_on_resources,average_active_time,resource_access_frequency,content_access_start,content_access_close
+
 app = FastAPI(title="Microservices API Gateway") 
 
 
@@ -177,3 +179,38 @@ async def update_exam_marks(
     }
 
     return await add_exam_marks_request(form_data)
+
+
+
+
+### behavioral
+
+
+@app.get("/api/TimeSpendOnResources/{subject_id}/{class_id}")
+async def get_time_spent_on_resources(subject_id: str, class_id: str):
+    return await time_spent_on_resources(subject_id, class_id)
+
+
+@app.get("/api/SiteAverageActiveTime/{class_id}")
+async def get_site_average_active_time(class_id: str):
+    return await average_active_time(class_id)
+
+
+@app.get("/api/ResourceAccessFrequency/{subject_id}/{class_id}")
+async def get_resource_access_frequency(subject_id: str, class_id: str):
+   return await resource_access_frequency(subject_id, class_id)
+
+
+@app.post("/api/startContentAccess")
+async def start_content_access(
+    student_id: str = Form(...),
+    content_id: str = Form(...)
+):
+    return await content_access_start(student_id, content_id)
+
+@app.post("/api/closeContentAccess")
+async def close_content_access(
+    student_id: str = Form(...),
+    content_id: str = Form(...)
+):
+    return await content_access_close(student_id, content_id)

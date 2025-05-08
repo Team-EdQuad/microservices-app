@@ -359,46 +359,45 @@ async def get_submission_marks(student_id: str):
     
     return submissions_responses
    
-
-#view exam marks
 @router.get("/exammarks/{student_id}", response_model=List[MarksResponse])
 async def get_exam_marks(student_id: str):
-    # Step 1: Fetch the exam_marks document for the given student_id
-    student_exam_data = db["exam_marks"].find_one({"student_id": student_id}, {"_id": 0})
+    # Step 1: Fetch all exam_marks documents for the given student_id
+    student_exam_docs = db["exam_marks"].find({"student_id": student_id}, {"_id": 0})
     
-    if not student_exam_data:
-        raise HTTPException(status_code=404, detail="No exam marks found for this student")
-    
-    # Step 2: Fetch class_name from the class collection using class_id
-    class_id = student_exam_data.get("class_id")
-    class_doc = db["class"].find_one({"class_id": class_id}, {"class_name": 1, "_id": 0})
-    class_name = class_doc.get("class_name") if class_doc else "Class not found"
-    
-    # Step 3: Extract and process exam marks from the nested structure
     marks_responses = []
-    exam_marks_list = student_exam_data.get("exam_marks", [])
+
+    found_any = False  # To track if we found any matching documents
     
-    for subject_entry in exam_marks_list:  # Loop over each subject's marks
-        subject_id = subject_entry.get("subject_id")
+    for student_exam_data in student_exam_docs:
+        found_any = True
         
-        # Fetch subject_name from the subject collection using subject_id
-        subject_doc = db["subject"].find_one({"subject_id": subject_id}, {"subject_name": 1, "_id": 0})
-        subject_name = subject_doc.get("subject_name") if subject_doc else "Subject not found"
-        
-        for exam in subject_entry.get("exams", []):  # Loop over the exams within each subject
-            marks_responses.append(MarksResponse(
-                term=exam.get("term"),
-                subject_id=subject_id,
-                subject_name=subject_name,
-                marks=exam.get("marks"),
-                class_id=class_id,
-                class_name=class_name
-            ))
-    
-    if not marks_responses:
-        raise HTTPException(status_code=404, detail="No exam marks found")
-    
+        class_id = student_exam_data.get("class_id")
+        class_doc = db["class"].find_one({"class_id": class_id}, {"class_name": 1, "_id": 0})
+        class_name = class_doc.get("class_name") if class_doc else "Class not found"
+        exam_year = student_exam_data.get("exam_year")
+        exam_marks_list = student_exam_data.get("exam_marks", [])
+
+        for subject_entry in exam_marks_list:
+            subject_id = subject_entry.get("subject_id")
+            subject_doc = db["subject"].find_one({"subject_id": subject_id}, {"subject_name": 1, "_id": 0})
+            subject_name = subject_doc.get("subject_name") if subject_doc else "Subject not found"
+
+            for exam in subject_entry.get("exams", []):
+                marks_responses.append(MarksResponse(
+                    term=exam.get("term"),
+                    subject_id=subject_id,
+                    subject_name=subject_name,
+                    marks=exam.get("marks"),
+                    class_id=class_id,
+                    class_name=class_name,
+                    exam_year=exam_year
+                ))
+
+    if not found_any or not marks_responses:
+        raise HTTPException(status_code=404, detail="No exam marks found for this student")
+
     return marks_responses
+
 
 
 #Submission 

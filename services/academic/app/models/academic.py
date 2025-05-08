@@ -23,6 +23,7 @@ class MarksResponse(BaseModel):
     marks: float
     class_id: str
     class_name: str  # New field for class name
+    exam_year: int
 
 
 class SubjectClassResponse(BaseModel):
@@ -130,3 +131,4 @@ class ExamMarksResponse(BaseModel):
     class_id: str
     class_name: Optional[str] = None  # This will be fetched from DB
     exam_marks: List[SubjectExams]
+    

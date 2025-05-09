@@ -76,17 +76,15 @@ async def get_assignment_details(assignment_id: str):
 
 @app.get("/api/assignmentmarks/{student_id}")
 async def fetch_assignment_marks(student_id: str):
-    marks = await get_assignment_marks(student_id)
-    if not marks:
-        return []  # or raise HTTPException(status_code=404, detail="No marks found")
-    return marks
-
+    return await get_assignment_marks(student_id)
+    
 @app.get("/api/exammarks/{student_id}")
 async def fetch_exam_marks(student_id: str):
-    marks = await get_exam_marks(student_id)
-    if not marks:
-        return []
-    return marks
+    return await get_exam_marks(student_id)
+    
+
+
+
 
 @app.post("/api/submission/{student_id}/{assignment_id}")
 async def submit_assignment_file(

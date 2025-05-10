@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from .database import student_table, subject_table, content_table, student_content_table
 from .database import assignment_table, submission_table, academic_attendance_table
-from .database import exam_table
+from .database import exam_table, behavioural_table
+from .database import collection31 ,collection32
 from  ..schemas.student_dashboard import all_progress, all_assignments, academic_attendance_rate
 from ..models.student_dashboard import SubjectProgress, SubjectAssignment, AcademicAttendanceRate, ExamMarksResponse
 from bson.objectid import ObjectId
@@ -171,7 +172,6 @@ async def get_academic_attendance_rate(student_id: str, class_id: str):
         for record in academic_attendance:
             record_date = datetime.strptime(record["date"], "%Y-%m-%d")
             if record_date.year == datetime.now().year and record['subject_id'] == "academic":
-                print(record['subject_id'])
                 total_days += 1
                 # for attendance_status in record["status"]:
                 #     if attendance_status["student_id"] == student_id:
@@ -307,3 +307,109 @@ async def get_weekly_attendance_rate(student_id: str, class_id: str):
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving weekly attendance rate: {str(e)}")
+
+
+@student_dashboard_router.get("/{student_id}/{class_id}/nonacademic-attendance")
+async def get_student_nonacademic_attendance(student_id: str, class_id: str):
+    current_year = str(datetime.now().year)
+
+    student = student_table.find_one({"student_id": student_id, "class_id": class_id})
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    sport_ids = student.get("sport_id", [])
+    club_ids = student.get("club_id", [])
+    activity_ids = sport_ids + club_ids
+
+    attendance_records = academic_attendance_table.find({
+        "class_id": class_id,
+        "subject_id": {"$in": activity_ids},
+        "date": {"$regex": f"^{current_year}"} 
+    })
+
+    
+    attendance_summary = {aid: {"present": 0, "total": 0} for aid in activity_ids}
+
+    for record in attendance_records:
+        subject_id = record["subject_id"]
+        if student_id in record["status"]:
+            attendance_summary[subject_id]["total"] += 1
+            if record["status"][student_id] == "present":
+                attendance_summary[subject_id]["present"] += 1
+
+    results = []
+    for aid, counts in attendance_summary.items():
+        name = ""
+        if aid in sport_ids:
+            sport = collection31.find_one({"sport_id": aid})
+            name = sport["sport_name"] if sport else aid
+        else:
+            club = collection32.find_one({"club_id": aid})
+            name = club["club_name"] if club else aid
+
+        total = counts["total"]
+        present = counts["present"]
+        absent = total - present
+        present_pct = round((present / total) * 100, 2) if total else 0
+        absent_pct = round((absent / total) * 100, 2) if total else 0
+
+        results.append({
+            "name": name,
+            "present": present_pct,
+            "absent": absent_pct
+        })
+
+    return {"activities_attendance": results}
+
+@student_dashboard_router.get("/{student_id}/{class_id}/engagement-score")
+def calculate_engagement_score(student_id: str, class_id: str):
+    try:
+        student = student_table.find_one({"student_id": student_id})
+        if not student or student.get("class_id") != class_id:
+            raise HTTPException(status_code=404, detail="Student not found or not in class")
+
+        subject_ids = student.get("subject_id", [])
+        if not subject_ids:
+            return {"engagement_score": 0}
+
+        total_contents = content_table.count_documents({
+            "class_id": class_id,
+            "subject_id": {"$in": subject_ids}
+        })
+
+        if total_contents == 0:
+            return {"engagement_score": 0}
+        
+        completed = student_content_table.count_documents({
+            "student_id": student_id,
+            "class_id": class_id,
+            "status": "Active"
+        })
+        completion_rate = (completed / total_contents) * 100
+
+        behavioural_records = list(behavioural_table.find({
+            "student_id": student_id,
+            "class_id": class_id,
+            "subject_id": {"$in": subject_ids}
+        }))
+
+        total_duration = sum([rec.get("durationMinutes", 0) for rec in behavioural_records])
+        total_accesses = sum([rec.get("accessCount", 0) for rec in behavioural_records])
+        unique_contents = len(set([rec["content_id"] for rec in behavioural_records]))
+
+        avg_duration = total_duration / unique_contents if unique_contents else 0
+        avg_access = total_accesses / unique_contents if unique_contents else 0
+
+        time_score = min((avg_duration / 10) * 100, 100)
+        frequency_score = min((avg_access / 3) * 100, 100)
+
+        engagement_score = (
+            0.5 * completion_rate +
+            0.3 * time_score +
+            0.2 * frequency_score
+        )
+
+        return {"engagement_score": round(engagement_score, 2)}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")

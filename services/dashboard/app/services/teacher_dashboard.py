@@ -63,6 +63,16 @@ async def get_uploaded_assignments(teacher_id: str):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving teacher assignments: {str(e)}")
+    _
+@teacher_dashboard_router.get("/classes", response_model=dict)
+def get_all_classes():
+    try:
+        classes_cursor = class_table.find({}, {"_id": 0, "class_id": 1, "class_name": 1})
+        classes = list(classes_cursor)  # Use list() instead of await
+        return {"classes": classes}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch classes: {str(e)}")
+
     
 @teacher_dashboard_router.get("/{class_id}/{exam_year}/exam-marks", response_model=List[ExamMarksResponse])
 async def get_class_exam_marks(class_id: str, exam_year: int):
@@ -236,9 +246,9 @@ async def get_student_progress(class_id: str, year: int = None):
         if not year:
             year = datetime.now().year
 
-        class_details = class_table.find_one({"class_id": class_id})
-        if not class_details:
-            raise HTTPException(status_code=404, detail="Class not found")
+        # class_details = class_table.find_one({"class_id": class_id})
+        # if not class_details:
+        #     raise HTTPException(status_code=404, detail="Class not found")
 
         all_students = list(student_table.find({"class_id": class_id}))
         academic_attendance = list(academic_attendance_table.find({"class_id": class_id}))
@@ -282,18 +292,33 @@ async def get_student_progress(class_id: str, year: int = None):
             second_term_avg = second_term_total / term2_count if term2_count else 0
             third_term_avg = third_term_total / term3_count if term3_count else 0
 
+    
             # --- Academic Attendance ---
             total_days = 0
             present_days = 0
+
             for record in academic_attendance:
                 record_date = datetime.strptime(record["date"], "%Y-%m-%d")
-                if record_date.year == year:
+                if record_date.year == year and record['subject_id'] == "academic":
                     total_days += 1
-                    for status in record.get("status", []):
-                        if status["student_id"] == student_id and status["status"]:
+                    if student_id in record["status"]:
+                        if record["status"][student_id] == "present":
                             present_days += 1
-                            break
             academic_attendance_rate = (present_days / total_days) * 100 if total_days else 0
+
+
+            # --- Non- Academic Attendance ---
+            total_days = 0
+            present_days = 0
+
+            for record in academic_attendance:
+                record_date = datetime.strptime(record["date"], "%Y-%m-%d")
+                if record_date.year == year and record['subject_id'] != "academic":
+                    total_days += 1
+                    if student_id in record["status"]:
+                        if record["status"][student_id] == "present":
+                            present_days += 1
+            non_academic_attendance_rate = (present_days / total_days) * 100 if total_days else 0
 
             # --- Academic Progress ---
             avg_academic_progress = 0
@@ -343,7 +368,7 @@ async def get_student_progress(class_id: str, year: int = None):
                 "second_term_avg": round(second_term_avg, 2),
                 "third_term_avg": round(third_term_avg, 2),
                 "academic_attendance_rate": round(academic_attendance_rate, 2),
-                "non_academic_attendance_rate": 0.0,  # Not implemented
+                "non_academic_attendance_rate": round(non_academic_attendance_rate,2),
                 "avg_academic_progress": round(avg_academic_progress, 2)
             })
 
@@ -352,34 +377,38 @@ async def get_student_progress(class_id: str, year: int = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving student progress: {str(e)}")
 
-
 @teacher_dashboard_router.get("/weekly_attendance", response_model=List[dict])
-async def get_weekly_attendance(class_id: str = "CLS001", year: int = datetime.now().year, week_num: int = datetime.now().isocalendar()[1]):
+async def get_weekly_attendance(
+    class_id: str = "CLS013",
+    year: int = datetime.now().year,
+    week_num: int = datetime.now().isocalendar()[1]
+    ):
     try:
         start_date = datetime.strptime(f"{year}-W{week_num-1}-1", "%Y-W%W-%w")
         end_date = start_date + timedelta(days=6)
 
+
         attendance_records = list(academic_attendance_table.find({
             "class_id": class_id,
-            "date": {"$gte": start_date.strftime("%Y-%m-%d"), "$lte": end_date.strftime("%Y-%m-%d")}
+            "subject_id": "academic",
+            "date": {
+                "$gte": start_date.strftime("%Y-%m-%d"),
+                "$lte": end_date.strftime("%Y-%m-%d")
+            }
         }))
 
         if not attendance_records:
-            raise HTTPException(status_code=404, detail="Attendance records not found")
-        
+            raise HTTPException(status_code=404, detail="No attendance records found")
+
         flattened_data = []
 
         for record in attendance_records:
-            day = record["weekday"]
-            present_ratio = record["present_ratio"]
-            absent_ratio = record["absent_ratio"]
-            total_students = len(record["status"])  
-
-            present_count = round(present_ratio * total_students)
-            absent_count = round(absent_ratio * total_students)
+            status_dict = record.get("status", {})
+            present_count = sum(1 for s in status_dict.values() if s.lower() == "present")
+            absent_count = sum(1 for s in status_dict.values() if s.lower() == "absent")
 
             flattened_data.append({
-                "weekday": day,
+                "weekday": record["weekday"],
                 "Present": present_count,
                 "Absent": absent_count
             })

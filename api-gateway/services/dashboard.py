@@ -63,27 +63,18 @@ async def current_weekly_attendance(student_id: str, class_id: str):
         response.raise_for_status()
         return response.json()
     
-# Optional: Fetch all at once (bundle call inside API gateway)
-# async def get_full_dashboard(student_id: str, class_id: str):
-#     async with httpx.AsyncClient() as client:
-#         progress_task = client.get(f"{DASHBOARD_SERVICE_URL}/{student_id}/{class_id}/progress")
-#         assignments_task = client.get(f"{DASHBOARD_SERVICE_URL}/{student_id}/{class_id}/assignments")
-#         attendance_task = client.get(f"{DASHBOARD_SERVICE_URL}/{student_id}/{class_id}/attendance")
-#         non_academic_task = client.get(f"{DASHBOARD_SERVICE_URL}/{student_id}/{class_id}/non-academic")
+async def non_academic_attendance(student_id: str, class_id: str):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{DASHBOARD_SERVICE_URL}/student/{student_id}/{class_id}/nonacademic-attendance")
+        response.raise_for_status()
+        return response.json()
 
-#         responses = await httpx.AsyncClient.gather(
-#             progress_task,
-#             assignments_task,
-#             attendance_task,
-#             non_academic_task
-#         )
 
-#         return {
-#             "progress": responses[0].json(),
-#             "assignments": responses[1].json(),
-#             "attendance": responses[2].json(),
-#             "non_academic": responses[3].json()
-#         }
+async def engagement_score(student_id: str, class_id: str):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{DASHBOARD_SERVICE_URL}/student/{student_id}/{class_id}/engagement-score")
+        response.raise_for_status()
+        return response.json()
 
 #-----------------End of Student Dashboard Routes------------------
 
@@ -95,6 +86,11 @@ async def get_teacher_assignments(teacher_id: str):
         response.raise_for_status()
         return response.json()
 
+async def get_all_Classes():
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{DASHBOARD_SERVICE_URL}/teacher/classes")
+        response.raise_for_status()
+        return response.json()
 
 async def get_exam_marks(class_id: str, exam_year: str):
     async with httpx.AsyncClient() as client:
@@ -103,9 +99,11 @@ async def get_exam_marks(class_id: str, exam_year: str):
         return response.json()
 
 
-async def get_student_progress_teacher(class_id: str):
+async def get_student_progress_teacher(class_id: str, year:int =None):
     async with httpx.AsyncClient() as client:
-        response = await client.get(f"{DASHBOARD_SERVICE_URL}/teacher/{class_id}/student_progress")
+        response = await client.get(f"{DASHBOARD_SERVICE_URL}/teacher/{class_id}/student_progress",
+        params={"year": year}
+        )
         response.raise_for_status()
         return response.json()
 

@@ -20,63 +20,53 @@ router = APIRouter()
 #view accessible subject and class  ( teacher )
 @router.get("/subjectNclass/{teacher_id}", response_model=SubjectClassResponse)
 async def get_subjectNclass(teacher_id: str):
-    # Fetch teacher document
     teacher = db["teacher"].find_one({"teacher_id": teacher_id})
-    
+
     if not teacher:
         raise HTTPException(status_code=404, detail="Teacher not found")
-    
-    subject_ids = teacher.get("subject_id", [])
-    class_ids = teacher.get("class_id", [])
-    
+
+    # Extract subject and class IDs from nested structure
+    subject_ids = set()
+    class_ids = set()
+
+    for entry in teacher.get("subjects_classes", []):
+        subject_ids.add(entry.get("subject_id"))
+        class_ids.update(entry.get("class_id", []))
+
     if not subject_ids:
         raise HTTPException(status_code=404, detail="No subject IDs associated with this teacher")
     if not class_ids:
         raise HTTPException(status_code=404, detail="No class IDs associated with this teacher")
-    
-    # Ensure subject_ids and class_ids are lists
-    if not isinstance(subject_ids, list):
-        subject_ids = [subject_ids]
-    if not isinstance(class_ids, list):
-        class_ids = [class_ids]
-    
-    # Get subjects and classes
+
+    # Fetch subject details
     subjects_cursor = db["subject"].find(
-        {"subject_id": {"$in": subject_ids}},
+        {"subject_id": {"$in": list(subject_ids)}},
         {"_id": 0, "subject_id": 1, "subject_name": 1}
     )
-    
+
+    # Fetch class details
     class_cursor = db["class"].find(
-        {"class_id": {"$in": class_ids}},
+        {"class_id": {"$in": list(class_ids)}},
         {"_id": 0, "class_id": 1, "class_name": 1}
     )
-    
-    subjects_list = list(subjects_cursor)
-    class_list = list(class_cursor)
-    
-    if not subjects_list:
+
+    subjects = [
+        SubjectResponse(Subject_id=doc["subject_id"], SubjectName=doc["subject_name"])
+        for doc in subjects_cursor
+    ]
+
+    classes = [
+        ClassResponse(class_id=doc["class_id"], class_name=doc["class_name"])
+        for doc in class_cursor
+    ]
+
+    if not subjects:
         raise HTTPException(status_code=404, detail="Subjects not found")
-    if not class_list:
+    if not classes:
         raise HTTPException(status_code=404, detail="Classes not found")
-    
-    # Create response objects
-    subjects = []
-    classes = []
-    
-    for subject in subjects_list:
-        subjects.append(SubjectResponse(
-            Subject_id=subject["subject_id"],
-            SubjectName=subject["subject_name"]
-        ))
-    
-    for cls in class_list:
-        classes.append(ClassResponse(
-            class_id=cls["class_id"],
-            class_name=cls["class_name"]
-        ))
-    
-    # Return combined response
+
     return SubjectClassResponse(subjects=subjects, classes=classes)
+
 
 
 @router.post("/assignmentcreate/{class_id}/{subject_id}/{teacher_id}", response_model=AssignmentResponse)

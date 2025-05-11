@@ -36,10 +36,15 @@ class ClassResponse(BaseModel):
     class_name: str  
 
 
-#subject name
-class SubjectClassResponse(BaseModel):
-    subjects: List[SubjectResponse]
+
+class SubjectWithClasses(BaseModel):
+    subject_id: str
+    subject_name: str
     classes: List[ClassResponse]
+
+class SubjectClassResponse(BaseModel):
+    subjects_classes: List[SubjectWithClasses]
+
 
 
 #student submission

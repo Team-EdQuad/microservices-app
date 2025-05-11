@@ -3,7 +3,7 @@ import os
 import uuid
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from typing import List
-from ..models.academic import AssignmentResponse, ClassResponse, ContentUploadResponse,SubjectClassResponse, SubjectResponse,SubmissionResponse
+from ..models.academic import AssignmentResponse, ClassResponse, ContentUploadResponse,SubjectClassResponse, SubjectResponse, SubjectWithClasses,SubmissionResponse
 from .database import db
 
 
@@ -18,6 +18,7 @@ ALLOWED_EXTENSIONS = {"pdf", "txt", "mp3", "mp4"}  # Allowed file types
 
 router = APIRouter()
 #view accessible subject and class  ( teacher )
+
 @router.get("/subjectNclass/{teacher_id}", response_model=SubjectClassResponse)
 async def get_subjectNclass(teacher_id: str):
     teacher = db["teacher"].find_one({"teacher_id": teacher_id})
@@ -25,47 +26,49 @@ async def get_subjectNclass(teacher_id: str):
     if not teacher:
         raise HTTPException(status_code=404, detail="Teacher not found")
 
-    # Extract subject and class IDs from nested structure
-    subject_ids = set()
-    class_ids = set()
+    subjects_classes_data = teacher.get("subjects_classes", [])
+    if not subjects_classes_data:
+        raise HTTPException(status_code=404, detail="No subject-class mapping found")
 
-    for entry in teacher.get("subjects_classes", []):
-        subject_ids.add(entry.get("subject_id"))
-        class_ids.update(entry.get("class_id", []))
+    # Collect all unique subject_ids and class_ids
+    subject_ids = {sc["subject_id"] for sc in subjects_classes_data}
+    class_ids = {cls_id for sc in subjects_classes_data for cls_id in sc.get("class_id", [])}
 
-    if not subject_ids:
-        raise HTTPException(status_code=404, detail="No subject IDs associated with this teacher")
-    if not class_ids:
-        raise HTTPException(status_code=404, detail="No class IDs associated with this teacher")
+    # Fetch subject documents
+    subject_docs = {
+        s["subject_id"]: s["subject_name"]
+        for s in db["subject"].find({"subject_id": {"$in": list(subject_ids)}}, {"_id": 0})
+    }
 
-    # Fetch subject details
-    subjects_cursor = db["subject"].find(
-        {"subject_id": {"$in": list(subject_ids)}},
-        {"_id": 0, "subject_id": 1, "subject_name": 1}
-    )
+    # Fetch class documents
+    class_docs = {
+        c["class_id"]: c["class_name"]
+        for c in db["class"].find({"class_id": {"$in": list(class_ids)}}, {"_id": 0})
+    }
 
-    # Fetch class details
-    class_cursor = db["class"].find(
-        {"class_id": {"$in": list(class_ids)}},
-        {"_id": 0, "class_id": 1, "class_name": 1}
-    )
+    # Build the response
+    result = []
+    for sc in subjects_classes_data:
+        subject_id = sc["subject_id"]
+        subject_name = subject_docs.get(subject_id, "Unknown Subject")
 
-    subjects = [
-        SubjectResponse(Subject_id=doc["subject_id"], SubjectName=doc["subject_name"])
-        for doc in subjects_cursor
-    ]
+        class_list = [
+            ClassResponse(
+                class_id=cid,
+                class_name=class_docs.get(cid, "Unknown Class")
+            )
+            for cid in sc.get("class_id", [])
+        ]
 
-    classes = [
-        ClassResponse(class_id=doc["class_id"], class_name=doc["class_name"])
-        for doc in class_cursor
-    ]
+        result.append(SubjectWithClasses(
+            subject_id=subject_id,
+            subject_name=subject_name,
+            classes=class_list
+        ))
 
-    if not subjects:
-        raise HTTPException(status_code=404, detail="Subjects not found")
-    if not classes:
-        raise HTTPException(status_code=404, detail="Classes not found")
+    return SubjectClassResponse(subjects_classes=result)
 
-    return SubjectClassResponse(subjects=subjects, classes=classes)
+
 
 
 

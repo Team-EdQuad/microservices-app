@@ -9,7 +9,6 @@ from datetime import datetime, timedelta
 
 teacher_dashboard_router = APIRouter()
 
-
 @teacher_dashboard_router.get("/{teacher_id}/assignments", response_model=List[dict])
 async def get_uploaded_assignments(teacher_id: str):
     try:
@@ -18,52 +17,57 @@ async def get_uploaded_assignments(teacher_id: str):
         if not teacher:
             raise HTTPException(status_code=404, detail=f"Teacher with ID {teacher_id} not found")
         
-        teacher_subjects = teacher.get("subject_id" ,[])
-        teacher_classes = teacher.get("class_id" , [])
-     
-        if not teacher_subjects :
-            raise HTTPException(status_code=404, detail=f"No subjects found for Teacher with ID {teacher_id}")
+        subjects_classes = teacher.get("subjects_classes", [])
+        if not subjects_classes:
+            raise HTTPException(status_code=404, detail=f"No subjects/classes found for Teacher with ID {teacher_id}")
         
         assignment_timeline = []
-        
 
-        for subject_id in teacher_subjects:
+        for entry in subjects_classes:
+            subject_id = entry["subject_id"]
+            class_ids = entry["class_id"]  # This is a list
+
             subject = subject_table.find_one({"subject_id": subject_id})
             if not subject:
-                continue 
-            
-            for class_id in teacher_classes:
+                continue
+
+            for class_id in class_ids:
                 class_details = class_table.find_one({"class_id": class_id})
                 if not class_details:
                     continue
-                
-                class_name = class_details.get("class_name")
+
+                class_name = class_details.get("class_name", class_id)
                 total_students = student_table.count_documents({"class_id": class_id})
 
-                assignments = assignment_table.find({"subject_id":subject_id, "class_id": class_id, "teacher_id" : teacher_id})
+                assignments = assignment_table.find({
+                    "subject_id": subject_id,
+                    "class_id": class_id,
+                    "teacher_id": teacher_id
+                })
 
                 for assignment in assignments:
                     deadline = assignment.get("deadline")
                     if isinstance(deadline, str):
                         deadline = datetime.fromisoformat(deadline)
-                    
-                    submission_count = submission_table.count_documents({"assignment_id" : assignment["assignment_id"]})
+
+                    submission_count = submission_table.count_documents({
+                        "assignment_id": assignment["assignment_id"]
+                    })
 
                     assignment_timeline.append({
-                    "assignment_name": assignment["assignment_name"],
-                    "subject_name": subject["subject_name"],
-                    "class_name": class_name,
-                    "deadline": deadline if deadline else None,
-                    "submission_count" : submission_count,
-                    "total_students" : total_students
-                    
+                        "assignment_name": assignment["assignment_name"],
+                        "subject_name": subject["subject_name"],
+                        "class_name": class_name,
+                        "deadline": deadline,
+                        "submission_count": submission_count,
+                        "total_students": total_students
                     })
-            
+
         return all_uploaded_assignments(assignment_timeline)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving teacher assignments: {str(e)}")
-    _
+
 @teacher_dashboard_router.get("/classes", response_model=dict)
 def get_all_classes():
     try:

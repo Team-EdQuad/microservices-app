@@ -1,10 +1,20 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, APIRouter, Body
 from services.nonacademic import get_all_sports, create_sport, get_all_clubs, create_club, filter_sports
+from services import usermanagement
+
+
+from schemas.usermanagement import LoginRequest
 import httpx 
 from fastapi.responses import JSONResponse
 
 app = FastAPI(title="Microservices API Gateway") 
 
+# User-management
+@app.post("/api/user-management/login")
+async def login_user(credentials: LoginRequest):
+    return await usermanagement.login_user(credentials.dict())
+
+#non-academic
 @app.get("/api/nonacademic/sports", response_model=list)
 async def fetch_all_sports():
     return await get_all_sports()

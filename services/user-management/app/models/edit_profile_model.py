@@ -5,6 +5,6 @@ class UserProfileUpdate(BaseModel):
     gender: str = Field(..., pattern="^(male|female|other)$", description="Must be 'male', 'female', or 'other'")
     language: str
     email: str
-    phone: str = Field(..., regex=r"^0\d{9}$")
+    phone: str = Field(..., pattern=r"^0\d{9}$")
     role: str
     joined_date: str

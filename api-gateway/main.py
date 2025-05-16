@@ -5,6 +5,8 @@ import httpx
 from fastapi.responses import JSONResponse
 from typing import List, Optional
 
+# from services.attendance.app.utils import schemas as attModSchemas
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'services')))
 
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,6 +25,11 @@ from services.academic import  get_assignment_file_by_id,get_content_by_id,get_c
 from services.behavioural import time_spent_on_resources,average_active_time,resource_access_frequency,content_access_start,content_access_close
 
 app = FastAPI(title="Microservices API Gateway") 
+
+# app.include_router(attendanceRouter)
+
+app.include_router(attendanceRouter)
+
 
 app.add_middleware(
     CORSMiddleware,

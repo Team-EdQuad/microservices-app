@@ -24,11 +24,13 @@ from schemas.usermanagement import LoginRequest
 from services.academic import  get_assignment_file_by_id,get_content_by_id,get_content_file_by_id,create_assignment_request,upload_content_request,view_ungraded_manual_submissions,update_manual_marks,add_exam_marks_request,get_subject_names,get_student_content,get_all_assignments,get_assignment_by_id,get_assignment_marks,get_exam_marks, upload_assignment_file ,mark_content_done,get_subject_and_class_for_teacher
 from services.behavioural import time_spent_on_resources,average_active_time,resource_access_frequency,content_access_start,content_access_close
 
+from services.attendance import attendanceRouter
+
 app = FastAPI(title="Microservices API Gateway") 
 
 # app.include_router(attendanceRouter)
 
-app.include_router(attendanceRouter)
+
 
 
 app.add_middleware(
@@ -386,8 +388,7 @@ async def weekly_attendance_admin(class_id: str = "CLS001", year: int = datetime
 
     
 
-
-
-
+#Attendance
+app.include_router(attendanceRouter)
     
 

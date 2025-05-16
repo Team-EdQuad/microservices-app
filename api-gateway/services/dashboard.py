@@ -92,7 +92,7 @@ async def get_all_Classes():
         response.raise_for_status()
         return response.json()
 
-async def get_exam_marks(class_id: str, exam_year: str):
+async def get_exam_marks_teacher(class_id: str, exam_year: str):
     async with httpx.AsyncClient() as client:
         response = await client.get(f"{DASHBOARD_SERVICE_URL}/teacher/{class_id}/{exam_year}/exam-marks")
         response.raise_for_status()

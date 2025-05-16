@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, APIRouter, Body, UploadFile, File, Form
 from services.nonacademic import get_all_sports, create_sport, get_all_clubs, create_club, filter_sports
 from services.dashboard import get_student_progress, get_student_assignments,filter_assignments,sort_assignments, get_student_attendance,get_student_exam_marks,monthly_attendance, current_weekly_attendance,non_academic_attendance,engagement_score
-from services.dashboard import get_teacher_assignments, get_exam_marks, get_student_progress_teacher, get_weekly_attendance,get_all_Classes
+from services.dashboard import get_teacher_assignments, get_exam_marks_teacher, get_student_progress_teacher, get_weekly_attendance,get_all_Classes
 from services.dashboard import get_exam_marks_admin,  get_student_progress_admin, get_weekly_attendance_admin, get_stats, get_all_users
 
 from services import usermanagement
@@ -322,7 +322,7 @@ async def get_all_classes():
 @app.get("/api/teacher/dashboard/{class_id}/{exam_year}/exam-marks")
 async def exam_marks(class_id: str, exam_year: int):
     try:
-        return await get_exam_marks(class_id, exam_year)
+        return await get_exam_marks_teacher(class_id, exam_year)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     

@@ -64,7 +64,6 @@ class SubmissionResponse(BaseModel):
     teacher_id: str
 
 
-
 class AssignmentItem(BaseModel):
     assignment_id: str
     assignment_name: str

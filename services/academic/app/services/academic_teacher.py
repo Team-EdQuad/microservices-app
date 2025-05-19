@@ -84,32 +84,32 @@ async def create_assignment(
     sample_answer: str = Form(None),
     file: UploadFile = File(...)
 ):
-    # ✅ Validate grading type
+    #  Validate grading type
     if grading_type == "auto" and not sample_answer:
         raise HTTPException(status_code=400, detail="Sample answer is required for auto grading.")
 
-    # ✅ Generate ID and file path
+    # Generate ID and file path
     assignment_id = f"ASM{uuid.uuid4().hex[:6].upper()}"
     file_name = f"{assignment_id}_{file.filename}"
 
-    # ✅ Ensure directory exists
+    # Ensure directory exists
     os.makedirs(ASSIGNMENT_DIR, exist_ok=True)
     file_path = os.path.join(ASSIGNMENT_DIR, file_name)
 
-    # ✅ Save uploaded file
+    # Save uploaded file
     with open(file_path, "wb") as f:
         f.write(await file.read())
 
-    # ✅ Convert deadline safely
+    # Convert deadline safely
     try:
         deadline_dt = datetime.fromisoformat(deadline)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid deadline format. Use ISO format (e.g., 2025-04-30T23:59:00)")
 
-    # ✅ Get current UTC time for upload timestamp
+    # Get current UTC time for upload timestamp
     created_at = datetime.utcnow()
 
-    # ✅ Insert data
+    # Insert data
     assignment_data = {
         "assignment_id": assignment_id,
         "assignment_name": assignment_name,
@@ -126,8 +126,6 @@ async def create_assignment(
 
     db["assignment"].insert_one(assignment_data)
     return AssignmentResponse(**assignment_data)
-
-
 
 
 

@@ -15,10 +15,45 @@ UPLOAD_DIR = "uploads/content/"  # Directory to save uploaded files
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 ALLOWED_EXTENSIONS = {"pdf", "txt", "mp3", "mp4"}  # Allowed file types
 
+router = APIRouter()
+
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
+import os
+from ..services.database import db  # adjust this path if needed
 
 router = APIRouter()
-#view accessible subject and class  ( teacher )
 
+@router.get("/submission/file/{submission_id}")
+async def serve_submission_file(submission_id: str):
+    try:
+        submission = db["submission"].find_one({"submission_id": submission_id})
+        if not submission:
+            raise HTTPException(status_code=404, detail="Submission not found")
+
+        file_path = submission.get("content_file_path")
+        if not file_path or not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="File not found")
+
+        ext = os.path.splitext(file_path)[1].lower()
+        media_type = {
+            ".pdf": "application/pdf",
+            ".txt": "text/plain"
+        }.get(ext, "application/octet-stream")
+
+        return FileResponse(
+            path=file_path,
+            media_type=media_type,
+            filename=os.path.basename(file_path),
+            headers={"Content-Disposition": f"inline; filename={os.path.basename(file_path)}"}
+        )
+
+    except Exception as e:
+        print(f"[ERROR] Serving submission_id={submission_id} -> {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+#view accessible subject and class  ( teacher )
 @router.get("/subjectNclass/{teacher_id}", response_model=SubjectClassResponse)
 async def get_subjectNclass(teacher_id: str):
     teacher = db["teacher"].find_one({"teacher_id": teacher_id})
@@ -67,9 +102,6 @@ async def get_subjectNclass(teacher_id: str):
         ))
 
     return SubjectClassResponse(subjects_classes=result)
-
-
-
 
 
 @router.post("/assignmentcreate/{class_id}/{subject_id}/{teacher_id}", response_model=AssignmentResponse)
@@ -128,8 +160,6 @@ async def create_assignment(
     return AssignmentResponse(**assignment_data)
 
 
-
-
 #upload content
 @router.post("/contentupload/{class_id}/{subject_id}", response_model=ContentUploadResponse)
 async def upload_content(
@@ -182,31 +212,43 @@ async def upload_content(
     return ContentUploadResponse(**content_data)
 
 
-##view submissions 
+#view submission ( teacher )
 @router.get("/submission_view/{teacher_id}", response_model=List[SubmissionResponse])
 async def view_manual_submission(teacher_id: str):
     teacher_data = db["teacher"].find_one({"teacher_id": teacher_id})
     if not teacher_data:
         raise HTTPException(status_code=404, detail="Teacher not found")
 
-    accessible_classes = teacher_data.get("class_id", [])
-    accessible_subjects = teacher_data.get("subject_id", [])
+    subjects_classes = teacher_data.get("subjects_classes", [])
+    if not subjects_classes:
+        raise HTTPException(status_code=404, detail="No subjects or classes found for this teacher")
 
-    # Find ungraded submissions from classes and subjects the teacher has access to
-    submissions_cursor = db["submission"].find({
-        "teacher_id": teacher_id,
-        "class_id": {"$in": accessible_classes},
-        "subject_id": {"$in": accessible_subjects},
-        "marks": None  # marks null means it's ungraded (manual)
-    })
+    # Build a list of subject-class combinations
+    filters = []
+    for item in subjects_classes:
+        subject_id = item.get("subject_id")
+        class_ids = item.get("class_id", [])
+        for cls_id in class_ids:
+            filters.append({
+                "teacher_id": teacher_id,
+                "subject_id": subject_id,
+                "class_id": cls_id,
+                "$or": [
+                    {"marks": None},
+                    {"marks": {"$exists": False}}
+                ]
+            })
 
+    # Collect matching submissions
     manual_submissions = []
-    for submission in submissions_cursor:
-        # Fetch related assignment info (optional)
-        assignment = db["assignment"].find_one({"assignment_id": submission["assignment_id"]})
-        if assignment:
-            submission["assignment_name"] = assignment.get("assignment_name")
-        manual_submissions.append(submission)
+    for f in filters:
+        submissions_cursor = db["submission"].find(f)
+        for submission in submissions_cursor:
+            # Optionally add assignment name
+            assignment = db["assignment"].find_one({"assignment_id": submission["assignment_id"]})
+            if assignment:
+                submission["assignment_name"] = assignment.get("assignment_name")
+            manual_submissions.append(submission)
 
     if not manual_submissions:
         raise HTTPException(status_code=404, detail="No manual submissions found")
@@ -214,7 +256,7 @@ async def view_manual_submission(teacher_id: str):
     return [SubmissionResponse(**submission) for submission in manual_submissions]
 
 
-#manual submissions marks add ( teacher )
+
 @router.post("/update_submission_marks/{teacher_id}", response_model=SubmissionResponse)
 async def update_submission_marks(
     teacher_id: str,
@@ -225,21 +267,17 @@ async def update_submission_marks(
     if marks < 0 or marks > 100:
         raise HTTPException(status_code=400, detail="Marks must be between 0 and 100.")
 
-    # Fetch submission details from MongoDB
-    submission = db["submission"].find_one({"submission_id": submission_id})
+    # Fetch the ungraded submission and ensure it's assigned to the teacher
+    submission = db["submission"].find_one({
+        "submission_id": submission_id,
+        "teacher_id": teacher_id,
+        "marks": None  # Ensure it hasn't been graded yet
+    })
+
     if not submission:
-        raise HTTPException(status_code=404, detail="Submission not found")
+        raise HTTPException(status_code=404, detail="Submission not found or already graded")
 
-    # Verify that the teacher has permission to grade this submission
-    if submission["teacher_id"] != teacher_id:
-        raise HTTPException(status_code=403, detail="You do not have permission to grade this submission")
-
-    # Check if the submission is manual grading type
-    assignment = db["assignment"].find_one({"assignment_id": submission["assignment_id"]})
-    if not assignment or assignment.get("grading_type") != "manual":
-        raise HTTPException(status_code=400, detail="Only manual grading submissions can be updated")
-
-    # Update the marks in the submission record
+    # Update the marks
     try:
         db["submission"].update_one(
             {"submission_id": submission_id},
@@ -248,9 +286,10 @@ async def update_submission_marks(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update marks: {str(e)}")
 
-    # Fetch updated submission for response
+    # Return the updated submission
     updated_submission = db["submission"].find_one({"submission_id": submission_id})
     return SubmissionResponse(**updated_submission)
+
 
 
 #enter exam marks of student ( teacher )

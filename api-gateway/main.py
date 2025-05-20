@@ -143,6 +143,8 @@ async def get_submission_file(submission_id: str):
 @app.get("/api/subjectNclass/{teacher_id}")
 async def get_subject_and_class(teacher_id: str):
     return await get_subject_and_class_for_teacher(teacher_id)
+
+
 @app.post("/api/assignmentcreate/{class_id}/{subject_id}/{teacher_id}")
 async def create_assignment(
     class_id: str,

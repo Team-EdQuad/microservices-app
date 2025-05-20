@@ -3,7 +3,7 @@ from app.routers import login, add_admin, add_student, add_teacher,delete_user,e
 from app.services.auth_service import get_current_user
 from app.models.admin_model import AdminModel
 
-app = FastAPI()
+app = FastAPI(title="User Management")
 
 # Include routers for each functionality
 app.include_router(login.router)

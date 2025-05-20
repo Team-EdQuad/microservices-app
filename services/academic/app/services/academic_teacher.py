@@ -3,7 +3,7 @@ import os
 import uuid
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from typing import List
-from ..models.academic import AssignmentResponse, ClassResponse, ContentUploadResponse,SubjectClassResponse, SubjectResponse, SubjectWithClasses,SubmissionResponse
+from ..models.academic import StudentResponse,AssignmentResponse, ClassResponse, ContentUploadResponse, StudentsResponse,SubjectClassResponse, SubjectResponse, SubjectWithClasses,SubmissionResponse
 from .database import db
 
 
@@ -292,43 +292,62 @@ async def update_submission_marks(
 
 
 
-#enter exam marks of student ( teacher )
 @router.post("/update_exam_marks", response_model=dict)
 async def add_exam_marks(
     teacher_id: str = Form(...),
     student_id: str = Form(...),
     exam_year: int = Form(...),
-    subject_name: str = Form(...),  # Teacher enters subject name
+    subject_name: str = Form(...),
     term: int = Form(...),
     marks: float = Form(...),
 ):
-    # Fetch class_id from student collection based on student_id
+    # Validate term (must be 1, 2, or 3)
+    if term not in [1, 2, 3]:
+        raise HTTPException(status_code=400, detail="Term must be 1, 2, or 3.")
+
+    # Fetch teacher data to validate permissions
+    teacher = db["teacher"].find_one({"teacher_id": teacher_id})
+    if not teacher:
+        raise HTTPException(status_code=404, detail=f"Teacher with ID {teacher_id} not found.")
+    
+    # Fetch subject data to get subject_id
+    subject = db["subject"].find_one({"subject_name": subject_name})
+    if not subject:
+        raise HTTPException(status_code=404, detail=f"Subject '{subject_name}' not found.")
+    subject_id = subject["subject_id"]
+
+    # Fetch student data to get class_id and validate subject enrollment
     student = db["student"].find_one({"student_id": student_id})
     if not student:
         raise HTTPException(status_code=404, detail=f"Student with ID {student_id} not found.")
-    
-    class_id = student["class_id"]  # Automatically retrieve class_id from student record
+    class_id = student["class_id"]
+    if subject_id not in student["subject_id"]:
+        raise HTTPException(status_code=400, detail=f"Student {student_id} is not enrolled in {subject_name}.")
 
-    # Fetch subject_id from subject collection based on subject_name
-    subject = db["subject"].find_one({"subject_name": subject_name})
-    if not subject:
-        raise HTTPException(status_code=404, detail=f"Subject with name '{subject_name}' not found.")
-    
-    subject_id = subject["subject_id"]  # Automatically retrieve subject_id
+    # Validate teacher's permission for subject and class
+    subjects_classes = teacher["subjects_classes"]
+    teacher_subject = next((sc for sc in subjects_classes if sc["subject_id"] == subject_id), None)
+    if not teacher_subject:
+        raise HTTPException(status_code=403, detail=f"Teacher {teacher_id} is not assigned to {subject_name}.")
+    if class_id not in teacher_subject["class_id"]:
+        raise HTTPException(status_code=403, detail=f"Teacher {teacher_id} is not assigned to class {class_id} for {subject_name}.")
 
-    # Generate a unique exam_id for the new exam entry
+    # Generate a unique exam_id
     exam_id = f"EXM{uuid.uuid4().hex[:6].upper()}"
 
-    # Check if the student already has exam marks for the given year
+    # Check for existing exam marks record
     existing_record = db["exam_marks"].find_one({"student_id": student_id, "exam_year": exam_year})
 
     if existing_record:
-        # Check if the subject_id already exists in the student's record
+        # Find or create the subject entry in exam_marks
         subject_found = False
         for subject_exam in existing_record["exam_marks"]:
             if subject_exam["subject_id"] == subject_id:
                 subject_found = True
-                # Append the new exam data to the existing subject's exams list
+                # Check if term already exists
+                if any(exam["term"] == term for exam in subject_exam["exams"]):
+                    raise HTTPException(status_code=400, detail=f"Marks for Term {term} in {subject_name} already exist for {exam_year}.")
+                # Append new exam data
                 subject_exam["exams"].append({
                     "exam_id": exam_id,
                     "term": term,
@@ -336,52 +355,163 @@ async def add_exam_marks(
                 })
                 break
 
-        # If subject_id doesn't exist, add it as a new subject
         if not subject_found:
             existing_record["exam_marks"].append({
                 "subject_id": subject_id,
                 "subject_name": subject_name,
-                "exams": [
-                    {
-                        "exam_id": exam_id,
-                        "term": term,
-                        "marks": marks,
-                    }
-                ],
+                "exams": [{"exam_id": exam_id, "term": term, "marks": marks}]
             })
 
-        # Update the existing record in the database
+        # Update the record in the database
         db["exam_marks"].update_one(
             {"student_id": student_id, "exam_year": exam_year},
-            {"$set": {"exam_marks": existing_record["exam_marks"]}},
+            {"$set": {"exam_marks": existing_record["exam_marks"]}}
         )
-        message = f"Updated marks for student {student_id}."
+        message = f"Marks updated for student {student_id} in {subject_name}, Term {term}, {exam_year}."
     else:
-        # Create a new record if it doesn't already exist
+        # Create a new exam marks record
         exam_marks_data = {
             "student_id": student_id,
             "exam_year": exam_year,
             "class_id": class_id,
             "teacher_id": teacher_id,
-            "exam_marks": [
-                {
-                    "subject_id": subject_id,
-                    "subject_name": subject_name,
-                    "exams": [
-                        {
-                            "exam_id": exam_id,
-                            "term": term,
-                            "marks": marks,
-                        }
-                    ],
-                }
-            ],
+            "exam_marks": [{
+                "subject_id": subject_id,
+                "subject_name": subject_name,
+                "exams": [{"exam_id": exam_id, "term": term, "marks": marks}]
+            }]
         }
-        # Insert new record into the database
         db["exam_marks"].insert_one(exam_marks_data)
-        message = f"Created new record and added marks for student {student_id}."
+        message = f"New marks record created for student {student_id} in {subject_name}, Term {term}, {exam_year}."
 
-    return {"detail": message}
+    return {"detail": message, "exam_id": exam_id}
+
+
+
+
+
+
+
+
+@router.get("/students/{class_id}/{subject_id}", response_model=StudentsResponse)
+async def get_students_by_class_and_subject(class_id: str, subject_id: str):
+    # Fetch students in the specified class who are enrolled in the subject
+    students = db["student"].find(
+        {
+            "class_id": class_id,
+            "subject_id": subject_id
+        },
+        {"_id": 0, "student_id": 1, "full_name": 1}
+    )
+
+    student_list = [
+        StudentResponse(student_id=student["student_id"], full_name=student["full_name"])
+        for student in students
+    ]
+
+    if not student_list:
+        raise HTTPException(status_code=404, detail=f"No students found for class {class_id} and subject {subject_id}")
+
+    return StudentsResponse(students=student_list)
+
+
+
+
+
+
+
+
+
+# #enter exam marks of student ( teacher )
+# @router.post("/update_exam_marks", response_model=dict)
+# async def add_exam_marks(
+#     teacher_id: str = Form(...),
+#     student_id: str = Form(...),
+#     exam_year: int = Form(...),
+#     subject_name: str = Form(...),  # Teacher enters subject name
+#     term: int = Form(...),
+#     marks: float = Form(...),
+# ):
+#     # Fetch class_id from student collection based on student_id
+#     student = db["student"].find_one({"student_id": student_id})
+#     if not student:
+#         raise HTTPException(status_code=404, detail=f"Student with ID {student_id} not found.")
+    
+#     class_id = student["class_id"]  # Automatically retrieve class_id from student record
+
+#     # Fetch subject_id from subject collection based on subject_name
+#     subject = db["subject"].find_one({"subject_name": subject_name})
+#     if not subject:
+#         raise HTTPException(status_code=404, detail=f"Subject with name '{subject_name}' not found.")
+    
+#     subject_id = subject["subject_id"]  # Automatically retrieve subject_id
+
+#     # Generate a unique exam_id for the new exam entry
+#     exam_id = f"EXM{uuid.uuid4().hex[:6].upper()}"
+
+#     # Check if the student already has exam marks for the given year
+#     existing_record = db["exam_marks"].find_one({"student_id": student_id, "exam_year": exam_year})
+
+#     if existing_record:
+#         # Check if the subject_id already exists in the student's record
+#         subject_found = False
+#         for subject_exam in existing_record["exam_marks"]:
+#             if subject_exam["subject_id"] == subject_id:
+#                 subject_found = True
+#                 # Append the new exam data to the existing subject's exams list
+#                 subject_exam["exams"].append({
+#                     "exam_id": exam_id,
+#                     "term": term,
+#                     "marks": marks,
+#                 })
+#                 break
+
+#         # If subject_id doesn't exist, add it as a new subject
+#         if not subject_found:
+#             existing_record["exam_marks"].append({
+#                 "subject_id": subject_id,
+#                 "subject_name": subject_name,
+#                 "exams": [
+#                     {
+#                         "exam_id": exam_id,
+#                         "term": term,
+#                         "marks": marks,
+#                     }
+#                 ],
+#             })
+
+#         # Update the existing record in the database
+#         db["exam_marks"].update_one(
+#             {"student_id": student_id, "exam_year": exam_year},
+#             {"$set": {"exam_marks": existing_record["exam_marks"]}},
+#         )
+#         message = f"Updated marks for student {student_id}."
+#     else:
+#         # Create a new record if it doesn't already exist
+#         exam_marks_data = {
+#             "student_id": student_id,
+#             "exam_year": exam_year,
+#             "class_id": class_id,
+#             "teacher_id": teacher_id,
+#             "exam_marks": [
+#                 {
+#                     "subject_id": subject_id,
+#                     "subject_name": subject_name,
+#                     "exams": [
+#                         {
+#                             "exam_id": exam_id,
+#                             "term": term,
+#                             "marks": marks,
+#                         }
+#                     ],
+#                 }
+#             ],
+#         }
+#         # Insert new record into the database
+#         db["exam_marks"].insert_one(exam_marks_data)
+#         message = f"Created new record and added marks for student {student_id}."
+
+#     return {"detail": message}
 
 
 

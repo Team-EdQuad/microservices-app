@@ -140,3 +140,14 @@ class ExamMarksResponse(BaseModel):
     class_name: Optional[str] = None  # This will be fetched from DB
     exam_marks: List[SubjectExams]
     
+
+
+
+
+
+class StudentResponse(BaseModel):
+    student_id: str
+    full_name: str
+
+class StudentsResponse(BaseModel):
+    students: List[StudentResponse]

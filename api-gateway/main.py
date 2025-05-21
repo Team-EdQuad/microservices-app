@@ -1,22 +1,13 @@
-<<<<<<< HEAD
 import sys
 import os
 from datetime import datetime, timedelta
-=======
-from fastapi import FastAPI, HTTPException, APIRouter, Body
-from services.nonacademic import get_all_sports, create_sport, get_all_clubs, create_club, filter_sports
-from services import usermanagement
-
-
-from schemas.usermanagement import LoginRequest
->>>>>>> 86258bc5a0677fce0594e9144a5120b1727da941
 import httpx 
 from fastapi.responses import JSONResponse
 from typing import List, Optional
 
 # from services.attendance.app.utils import schemas as attModSchemas
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(_file_), 'services')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'services')))
 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, APIRouter, Body, UploadFile, File, Form
@@ -37,10 +28,7 @@ from services.attendance import attendanceRouter
 
 app = FastAPI(title="Microservices API Gateway") 
 
-<<<<<<< HEAD
 # app.include_router(attendanceRouter)
-
-
 
 
 app.add_middleware(
@@ -52,13 +40,10 @@ app.add_middleware(
 )
 
 #Non-Academic Routes
-
-=======
 # User-management
 @app.post("/api/user-management/login")
 async def login_user(credentials: LoginRequest):
     return await usermanagement.login_user(credentials.dict())
->>>>>>> 86258bc5a0677fce0594e9144a5120b1727da941
 
 #non-academic
 @app.get("/api/nonacademic/sports", response_model=list)
@@ -403,3 +388,4 @@ async def weekly_attendance_admin(class_id: str = "CLS001", year: int = datetime
 
 #Attendance
 app.include_router(attendanceRouter)
+    

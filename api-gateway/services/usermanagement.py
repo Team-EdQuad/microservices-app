@@ -4,9 +4,6 @@ from typing import Optional
 
 USER_MANAGEMENT_SERVICE_URL = "http://127.0.0.1:8001"
 
-<<<<<<< HEAD
-router = APIRouter()
-=======
 
 async def login_user(credentials: dict):
     try:
@@ -21,4 +18,3 @@ async def login_user(credentials: dict):
         raise HTTPException(status_code=exc.response.status_code, detail="Login failed")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
->>>>>>> 86258bc5a0677fce0594e9144a5120b1727da941

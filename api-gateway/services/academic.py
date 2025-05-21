@@ -1,4 +1,313 @@
+import os
 import httpx
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 
 ACADEMIC_SERVICE_URL = "http://127.0.0.1:8002"
+
+
+
+
+async def get_content_by_id(content_id: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{ACADEMIC_SERVICE_URL}/content/{content_id}"
+            print(f"Calling URL: {url}")
+            response = await client.get(url)
+            print(f"Response Status: {response.status_code}")
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        print(f"HTTPStatusError: {exc.response.status_code}, {exc.response.text}")
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        print(f"Exception: {str(exc)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(exc)}")
+
+
+async def get_content_file_by_id(content_id: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{ACADEMIC_SERVICE_URL}/content/file/{content_id}"
+            print(f"Calling URL: {url}")
+            response = await client.get(url)
+            print(f"Response Status: {response.status_code}, Headers: {response.headers}")
+            response.raise_for_status()
+            
+            # Extract the headers we need to forward
+            content_type = response.headers.get("content-type", "application/octet-stream")
+            content_disposition = response.headers.get("content-disposition", "attachment")
+            filename = response.headers.get("filename", f"file-{content_id}")
+            
+            # Return a StreamingResponse instead of raw content
+            return StreamingResponse(
+                iter([response.content]), 
+                media_type=content_type,
+                headers={"Content-Disposition": content_disposition}
+            )
+    except httpx.HTTPStatusError as exc:
+        print(f"HTTPStatusError: {exc.response.status_code}, {exc.response.text}")
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        print(f"Exception: {str(exc)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(exc)}")
+    
+
+
+
+
+async def get_assignment_file_by_id(assignment_id: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{ACADEMIC_SERVICE_URL}/assignment/file/{assignment_id}"
+            print(f"Calling URL: {url}")
+            response = await client.get(url)
+            print(f"Response Status: {response.status_code}, Headers: {response.headers}")
+            response.raise_for_status()
+            
+            # Extract the headers we need to forward
+            content_type = response.headers.get("content-type", "application/octet-stream")
+            content_disposition = response.headers.get("content-disposition", "attachment")
+            filename = response.headers.get("filename", f"file-{assignment_id}")
+            
+            # Return a StreamingResponse instead of raw content
+            return StreamingResponse(
+                iter([response.content]), 
+                media_type=content_type,
+                headers={"Content-Disposition": content_disposition}
+            )
+    except httpx.HTTPStatusError as exc:
+        print(f"HTTPStatusError: {exc.response.status_code}, {exc.response.text}")
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        print(f"Exception: {str(exc)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(exc)}")
+    
+
+
+
+
+
+
+
+
+# async def get_content_file_by_id(content_id: str):
+#     try:
+#         async with httpx.AsyncClient() as client:
+#             url = f"{ACADEMIC_SERVICE_URL}/content/file/{content_id}"
+#             print(f"Calling URL: {url}")
+#             response = await client.get(url)
+#             print(f"Response Status: {response.status_code}, Headers: {response.headers}")
+#             response.raise_for_status()
+#             return response.content
+#     except httpx.HTTPStatusError as exc:
+#         print(f"HTTPStatusError: {exc.response.status_code}, {exc.response.text}")
+#         raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+#     except Exception as exc:
+#         print(f"Exception: {str(exc)}")
+#         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(exc)}")
+    
+    
+async def get_subject_names(student_id: str):
+    """
+    Fetch the list of subjects for a given student by calling the academic service.
+    """
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{ACADEMIC_SERVICE_URL}/students/{student_id}/subjects"
+            response = await client.get(url)
+            response.raise_for_status()  # Raise an exception for HTTP errors
+            return response.json()  # Return the JSON response
+    except httpx.HTTPStatusError as exc:
+        # Handle HTTP errors (e.g., 404, 500)
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        # Handle other exceptions (e.g., network issues)
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(exc)}")
+    
+    
+async def get_student_content(student_id: str, subject_id: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{ACADEMIC_SERVICE_URL}/content/{student_id}/{subject_id}"
+            response = await client.get(url)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error fetching content: {str(exc)}")
+
+async def get_all_assignments(student_id: str, subject_id: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{ACADEMIC_SERVICE_URL}/show_assignments/{student_id}/{subject_id}"
+            response = await client.get(url)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error fetching assignments: {str(exc)}")
+    
+async def get_assignment_by_id(assignment_id: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{ACADEMIC_SERVICE_URL}/assignment/{assignment_id}"
+            response = await client.get(url)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error fetching assignment: {str(exc)}")
+
+
+async def get_assignment_marks(student_id: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{ACADEMIC_SERVICE_URL}/submissionmarks/{student_id}"
+            response = await client.get(url)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error fetching assignment marks: {str(exc)}")
+
+
+async def get_exam_marks(student_id: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{ACADEMIC_SERVICE_URL}/exammarks/{student_id}"
+            response = await client.get(url)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error fetching exam marks: {str(exc)}")
+
+
+async def upload_assignment_file(student_id: str, assignment_id: str, file: UploadFile):
+    try:
+        async with httpx.AsyncClient() as client:
+            files = {"file": (file.filename, await file.read(), file.content_type)}
+            url = f"{ACADEMIC_SERVICE_URL}/submission/{student_id}/{assignment_id}"
+            response = await client.post(url, files=files)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Submission failed: {str(exc)}")
+
+
+async def mark_content_done(content_id: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{ACADEMIC_SERVICE_URL}/content/{content_id}"
+            response = await client.post(url)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to update content status: {str(exc)}")
+    
+
+###teacher 
+async def get_subject_and_class_for_teacher(teacher_id: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{ACADEMIC_SERVICE_URL}/subjectNclass/{teacher_id}"
+            response = await client.get(url)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error fetching subject/class: {str(exc)}")
+
+async def create_assignment_request(class_id: str, subject_id: str, teacher_id: str, form_data: dict, file: UploadFile):
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{ACADEMIC_SERVICE_URL}/assignmentcreate/{class_id}/{subject_id}/{teacher_id}"
+            data = {
+                "assignment_name": form_data["assignment_name"],
+                "description": form_data["description"],
+                "deadline": form_data["deadline"],
+                "grading_type": form_data["grading_type"],
+            }
+            if form_data["grading_type"] == "auto":
+                data["sample_answer"] = form_data.get("sample_answer", "")
+
+            files = {"file": (file.filename, await file.read(), file.content_type)}
+
+            response = await client.post(url, data=data, files=files)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        # Show the backend error for debugging
+        print("Backend error:", exc.response.text)
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(exc)}")
+
+
+async def upload_content_request(class_id: str, subject_id: str, content_name: str, description: str, file: UploadFile):
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{ACADEMIC_SERVICE_URL}/contentupload/{class_id}/{subject_id}"
+            data = {
+                "content_name": content_name,
+                "description": description,
+            }
+            files = {"file": (file.filename, await file.read(), file.content_type)}
+            response = await client.post(url, data=data, files=files)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error uploading content: {str(exc)}")
+
+
+async def view_ungraded_manual_submissions(teacher_id: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{ACADEMIC_SERVICE_URL}/submission_view/{teacher_id}"
+            response = await client.get(url)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error viewing manual submissions: {str(exc)}")
+
+
+async def update_manual_marks(teacher_id: str, submission_id: str, marks: float):
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{ACADEMIC_SERVICE_URL}/update_submission_marks/{teacher_id}"
+            data = {"submission_id": submission_id, "marks": marks}
+            response = await client.post(url, data=data)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error updating marks: {str(exc)}")
+
+
+async def add_exam_marks_request(form_data: dict):
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{ACADEMIC_SERVICE_URL}/update_exam_marks"
+            response = await client.post(url, data=form_data)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error adding exam marks: {str(exc)}")

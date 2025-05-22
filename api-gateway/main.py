@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import httpx 
 from fastapi.responses import JSONResponse
 from typing import List, Optional
+from fastapi import Depends,Request
 
 # from services.attendance.app.utils import schemas as attModSchemas
 
@@ -16,7 +17,7 @@ from services.dashboard import get_student_progress, get_student_assignments,fil
 from services.dashboard import get_teacher_assignments, get_exam_marks_teacher, get_student_progress_teacher, get_weekly_attendance,get_all_Classes
 from services.dashboard import get_exam_marks_admin,  get_student_progress_admin, get_weekly_attendance_admin, get_stats, get_all_users
 
-from services import usermanagement
+from services.usermanagement import login_user, get_current_user
 
 from schemas.usermanagement import LoginRequest
 
@@ -35,17 +36,24 @@ app = FastAPI(title="Microservices API Gateway")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Frontend URL
+    allow_origins=["*"],  # Frontend URL
+    # allow_origins=["http://localhost:5173"],  # Frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-#Non-Academic Routes
+
 # User-management
 @app.post("/api/user-management/login")
 async def login_user(credentials: LoginRequest):
-    return await usermanagement.login_user(credentials.dict())
+    return await login_user(credentials.dict())
+
+# @app.get("/api/user-management/user-data")
+# async def get_user_data(request: Request):
+#     current_user = await get_current_user(request)
+#     if current_user["role"] == "admin":
+#         return {"message": "Admin data", "data": current_user}
 
 #non-academic
 @app.get("/api/nonacademic/sports", response_model=list)

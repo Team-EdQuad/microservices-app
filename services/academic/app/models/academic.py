@@ -51,12 +51,15 @@ class SubjectClassResponse(BaseModel):
 class SubmissionResponse(BaseModel):
     submission_id: str
     subject_id: str
+    subject_name: Optional[str] = None  
     content_file_path: str
     submit_time_date: datetime
     class_id: str
+    class_name: Optional[str] = None
     file_name: str
     marks: Optional[int] = None
     assignment_id: str
+    assignment_name: Optional[str] = None 
     student_id: str
     teacher_id: str
 
@@ -137,3 +140,14 @@ class ExamMarksResponse(BaseModel):
     class_name: Optional[str] = None  # This will be fetched from DB
     exam_marks: List[SubjectExams]
     
+
+
+
+
+
+class StudentResponse(BaseModel):
+    student_id: str
+    full_name: str
+
+class StudentsResponse(BaseModel):
+    students: List[StudentResponse]

@@ -192,14 +192,34 @@ async def get_assignment_marks(student_id: str):
 
 async def get_exam_marks(student_id: str):
     try:
-        async with httpx.AsyncClient() as client:
+        print(f"Fetching exam marks for student: {student_id}")
+        print(f"ACADEMIC_SERVICE_URL: {ACADEMIC_SERVICE_URL}")
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
             url = f"{ACADEMIC_SERVICE_URL}/exammarks/{student_id}"
+            print(f"Full request URL: {url}")
+            
             response = await client.get(url)
+            print(f"Response status: {response.status_code}")
+            print(f"Response headers: {dict(response.headers)}")
+            
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            print(f"Successfully retrieved {len(data)} exam records")
+            return data
+            
     except httpx.HTTPStatusError as exc:
+        print(f"HTTP Status Error: {exc.response.status_code}")
+        print(f"Error response: {exc.response.text}")
         raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except httpx.ConnectError as exc:
+        print(f"Connection Error: {str(exc)}")
+        raise HTTPException(status_code=503, detail=f"Service unavailable: {str(exc)}")
+    except httpx.TimeoutException as exc:
+        print(f"Timeout Error: {str(exc)}")
+        raise HTTPException(status_code=504, detail=f"Request timeout: {str(exc)}")
     except Exception as exc:
+        print(f"Unexpected error: {type(exc).__name__}: {str(exc)}")
         raise HTTPException(status_code=500, detail=f"Error fetching exam marks: {str(exc)}")
 
 

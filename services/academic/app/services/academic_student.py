@@ -3,16 +3,19 @@ import os
 import uuid
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from typing import List
+
+from ..utils.grading_gemini import grade_answer
+from ..utils.grading_deepseek import grade_answer_deepseek
 from ..models.academic import AssignmentListResponse, AssignmentViewResponse, ContentResponse, MarksResponse, SubjectResponse,AssignmentMarksResponse, SubmissionResponse
 from .database import db
 from ..utils.file_utils import extract_text
-from ..utils.grading import grade_answer
+from ..utils.grading_gemini import grade_answer
 from fastapi.responses import FileResponse
 from .database import db
 from .google_drive import get_drive_service, FOLDER_IDS
 from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 from ..utils.file_utils import extract_text
-from ..utils.grading import grade_answer
+from ..utils.grading_gemini import grade_answer
 import io
 import logging
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -463,7 +466,7 @@ async def submit_assignment(student_id: str, assignment_id: str, file: UploadFil
         if grading_type == "auto" and sample_answer:
             try:
                 file_io = download_from_drive(drive_service, google_drive_file_id)
-                student_text = extract_text(file_io)
+                student_text = extract_text(file_io,file.filename)
                 marks = grade_answer(sample_answer, student_text)
             except Exception as e:
                 logger.error(f"Auto-grading failed for submission_id={submission_id}: {str(e)}")

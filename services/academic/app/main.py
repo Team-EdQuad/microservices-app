@@ -7,8 +7,7 @@ from dotenv import load_dotenv
 
 # Load .env
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
-API_KEY = os.getenv("GEMINI_API_KEY")
-genai.configure(api_key=API_KEY)
+
 
 app = FastAPI(title="Academic API")
 

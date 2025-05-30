@@ -116,8 +116,8 @@ async def submit_assignment_file(
     assignment_id: str,
     file: UploadFile = File(...)
 ):
-    result = await upload_assignment_file(student_id, assignment_id, file)
-    return {"message": "Submission successful", "data": result}
+    return await upload_assignment_file(student_id, assignment_id, file)
+    
 
 
 

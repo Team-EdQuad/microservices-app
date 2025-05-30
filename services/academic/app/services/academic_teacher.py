@@ -238,34 +238,6 @@ async def upload_content(
       
 
 
-# @router.get("/submission_view/{teacher_id}", response_model=List[SubmissionResponse])
-# async def view_manual_submission(teacher_id: str):
-#     # Simple query - find all submissions for this teacher with null marks
-#     query = {
-#         "teacher_id": teacher_id,
-#         "$or": [
-#             {"marks": None},
-#             {"marks": {"$exists": False}}
-#         ]
-#     }
-    
-#     # Find submissions
-#     submissions_cursor = db["submission"].find(query)
-#     manual_submissions = []
-    
-#     for submission in submissions_cursor:
-#         # Add assignment name if needed
-#         assignment = db["assignment"].find_one({"assignment_id": submission["assignment_id"]})
-#         if assignment:
-#             submission["assignment_name"] = assignment.get("assignment_name")
-#         manual_submissions.append(submission)
-
-#     if not manual_submissions:
-#         raise HTTPException(status_code=404, detail="No submissions with null marks found")
-
-#     return [SubmissionResponse(**submission) for submission in manual_submissions]
-
-
 
 #view submission ( teacher )
 @router.get("/submission_view/{teacher_id}", response_model=List[SubmissionResponse])

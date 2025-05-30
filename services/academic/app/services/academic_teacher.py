@@ -11,6 +11,7 @@ from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 import io
 import logging
 from tenacity import retry, stop_after_attempt, wait_exponential
+from pymongo.errors import PyMongoError
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -63,6 +64,8 @@ async def serve_submission_file(submission_id: str):
     except Exception as e:
         print(f"[ERROR] Serving submission_id={submission_id} -> {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
 
 
 #view accessible subject and class  ( teacher )
@@ -233,6 +236,35 @@ async def upload_content(
         logger.error(f"[ERROR] Uploading content_id={content_id} -> {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to upload content: {str(e)}")
       
+
+
+# @router.get("/submission_view/{teacher_id}", response_model=List[SubmissionResponse])
+# async def view_manual_submission(teacher_id: str):
+#     # Simple query - find all submissions for this teacher with null marks
+#     query = {
+#         "teacher_id": teacher_id,
+#         "$or": [
+#             {"marks": None},
+#             {"marks": {"$exists": False}}
+#         ]
+#     }
+    
+#     # Find submissions
+#     submissions_cursor = db["submission"].find(query)
+#     manual_submissions = []
+    
+#     for submission in submissions_cursor:
+#         # Add assignment name if needed
+#         assignment = db["assignment"].find_one({"assignment_id": submission["assignment_id"]})
+#         if assignment:
+#             submission["assignment_name"] = assignment.get("assignment_name")
+#         manual_submissions.append(submission)
+
+#     if not manual_submissions:
+#         raise HTTPException(status_code=404, detail="No submissions with null marks found")
+
+#     return [SubmissionResponse(**submission) for submission in manual_submissions]
+
 
 
 #view submission ( teacher )
@@ -430,160 +462,6 @@ async def get_students_by_class_and_subject(class_id: str, subject_id: str):
         raise HTTPException(status_code=404, detail=f"No students found for class {class_id} and subject {subject_id}")
 
     return StudentsResponse(students=student_list)
-
-
-
-
-
-
-
-
-
-# #enter exam marks of student ( teacher )
-# @router.post("/update_exam_marks", response_model=dict)
-# async def add_exam_marks(
-#     teacher_id: str = Form(...),
-#     student_id: str = Form(...),
-#     exam_year: int = Form(...),
-#     subject_name: str = Form(...),  # Teacher enters subject name
-#     term: int = Form(...),
-#     marks: float = Form(...),
-# ):
-#     # Fetch class_id from student collection based on student_id
-#     student = db["student"].find_one({"student_id": student_id})
-#     if not student:
-#         raise HTTPException(status_code=404, detail=f"Student with ID {student_id} not found.")
-    
-#     class_id = student["class_id"]  # Automatically retrieve class_id from student record
-
-#     # Fetch subject_id from subject collection based on subject_name
-#     subject = db["subject"].find_one({"subject_name": subject_name})
-#     if not subject:
-#         raise HTTPException(status_code=404, detail=f"Subject with name '{subject_name}' not found.")
-    
-#     subject_id = subject["subject_id"]  # Automatically retrieve subject_id
-
-#     # Generate a unique exam_id for the new exam entry
-#     exam_id = f"EXM{uuid.uuid4().hex[:6].upper()}"
-
-#     # Check if the student already has exam marks for the given year
-#     existing_record = db["exam_marks"].find_one({"student_id": student_id, "exam_year": exam_year})
-
-#     if existing_record:
-#         # Check if the subject_id already exists in the student's record
-#         subject_found = False
-#         for subject_exam in existing_record["exam_marks"]:
-#             if subject_exam["subject_id"] == subject_id:
-#                 subject_found = True
-#                 # Append the new exam data to the existing subject's exams list
-#                 subject_exam["exams"].append({
-#                     "exam_id": exam_id,
-#                     "term": term,
-#                     "marks": marks,
-#                 })
-#                 break
-
-#         # If subject_id doesn't exist, add it as a new subject
-#         if not subject_found:
-#             existing_record["exam_marks"].append({
-#                 "subject_id": subject_id,
-#                 "subject_name": subject_name,
-#                 "exams": [
-#                     {
-#                         "exam_id": exam_id,
-#                         "term": term,
-#                         "marks": marks,
-#                     }
-#                 ],
-#             })
-
-#         # Update the existing record in the database
-#         db["exam_marks"].update_one(
-#             {"student_id": student_id, "exam_year": exam_year},
-#             {"$set": {"exam_marks": existing_record["exam_marks"]}},
-#         )
-#         message = f"Updated marks for student {student_id}."
-#     else:
-#         # Create a new record if it doesn't already exist
-#         exam_marks_data = {
-#             "student_id": student_id,
-#             "exam_year": exam_year,
-#             "class_id": class_id,
-#             "teacher_id": teacher_id,
-#             "exam_marks": [
-#                 {
-#                     "subject_id": subject_id,
-#                     "subject_name": subject_name,
-#                     "exams": [
-#                         {
-#                             "exam_id": exam_id,
-#                             "term": term,
-#                             "marks": marks,
-#                         }
-#                     ],
-#                 }
-#             ],
-#         }
-#         # Insert new record into the database
-#         db["exam_marks"].insert_one(exam_marks_data)
-#         message = f"Created new record and added marks for student {student_id}."
-
-#     return {"detail": message}
-
-
-
-
-
-
-
-
-# #asssignment create ( teacher )
-# @router.post("/assignmentcreate/{class_id}/{subject_id}/{teacher_id}", response_model=AssignmentResponse)
-# async def create_assignment(
-#     class_id: str,
-#     subject_id: str,
-#     teacher_id: str,
-#     assignment_name: str = Form(...),
-#     description: str = Form(...),
-#     deadline: str = Form(...),  # ISO format string
-#     grading_type: str = Form(...),  # "manual" or "auto"
-#     sample_answer: str = Form(None),  # Required if grading_type is "auto"
-#     file: UploadFile = File(...)
-# ):
-#     # Validate grading type
-#     if grading_type == "auto" and not sample_answer:
-#         raise HTTPException(status_code=400, detail="Sample answer is required for auto grading.")
-
-#     # Generate unique assignment ID
-#     assignment_id = f"ASM{uuid.uuid4().hex[:6].upper()}"
-
-#     # Create file path
-#     file_name = f"{assignment_id}_{file.filename}"
-#     file_path = os.path.join(ASSIGNMENT_DIR, file_name)
-
-#     # Save file
-#     with open(file_path, "wb") as f:
-#         f.write(await file.read())
-
-#     # Create assignment record
-#     assignment_data = {
-#         "assignment_id": assignment_id,
-#         "assignment_name": assignment_name,
-#         "description": description,
-#         "deadline": datetime.fromisoformat(deadline),
-#         "assignment_file_path": file_path,
-#         "class_id": class_id,
-#         "subject_id": subject_id,
-#         "teacher_id": teacher_id,
-#         "grading_type": grading_type,
-#         "sample_answer": sample_answer if grading_type == "auto" else None
-#     }
-
-#     # Insert into MongoDB
-#     db["assignment"].insert_one(assignment_data)
-
-#     return AssignmentResponse(**assignment_data)
-
 
 
 

@@ -99,7 +99,6 @@ async def serve_content_file(content_id: str):
         print(f"Unexpected error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
     
-
 @router.get("/assignment/file/{assignment_id}")
 async def serve_assignment_file(assignment_id: str):
     try:

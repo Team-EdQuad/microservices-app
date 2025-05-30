@@ -5,8 +5,6 @@ from fastapi.responses import StreamingResponse
 
 ACADEMIC_SERVICE_URL = "http://127.0.0.1:8002"
 
-
-
     
     
 async def get_student_list_by_class_and_subject(class_id, subject_id):
@@ -68,9 +66,6 @@ async def get_content_file_by_id(content_id: str):
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(exc)}")
     
 
-
-
-
 async def get_submission_file_by_id(submission_id):
     try:
         async with httpx.AsyncClient() as client:
@@ -99,12 +94,6 @@ async def get_submission_file_by_id(submission_id):
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(exc)}")
     
 
-
-
-
-
-
-
 async def get_assignment_file_by_id(assignment_id: str):
     try:
         async with httpx.AsyncClient() as client:
@@ -131,14 +120,6 @@ async def get_assignment_file_by_id(assignment_id: str):
     except Exception as exc:
         print(f"Exception: {str(exc)}")
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(exc)}")
-    
-
-
-
-
-
-
-
     
     
 async def get_subject_names(student_id: str):
@@ -234,6 +215,26 @@ async def upload_assignment_file(student_id: str, assignment_id: str, file: Uplo
         raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Submission failed: {str(exc)}")
+
+
+
+
+
+
+
+
+# async def upload_assignment_file(student_id: str, assignment_id: str, file: UploadFile):
+#     try:
+#         async with httpx.AsyncClient() as client:
+#             files = {"file": (file.filename, await file.read(), file.content_type)}
+#             url = f"{ACADEMIC_SERVICE_URL}/submission/{student_id}/{assignment_id}"
+#             response = await client.post(url, files=files)
+#             response.raise_for_status()
+#             return response.json()
+#     except httpx.HTTPStatusError as exc:
+#         raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+#     except Exception as exc:
+#         raise HTTPException(status_code=500, detail=f"Submission failed: {str(exc)}")
 
 
 async def mark_content_done(content_id: str):

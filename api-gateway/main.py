@@ -110,8 +110,6 @@ async def fetch_exam_marks(student_id: str):
     
 
 
-
-
 @app.post("/api/submission/{student_id}/{assignment_id}")
 async def submit_assignment_file(
     student_id: str,
@@ -120,6 +118,17 @@ async def submit_assignment_file(
 ):
     result = await upload_assignment_file(student_id, assignment_id, file)
     return {"message": "Submission successful", "data": result}
+
+
+
+# @app.post("/api/submission/{student_id}/{assignment_id}")
+# async def submit_assignment_file(
+#     student_id: str,
+#     assignment_id: str,
+#     file: UploadFile = File(...)
+# ):
+#     result = await upload_assignment_file(student_id, assignment_id, file)
+#     return {"message": "Submission successful", "data": result}
 
 @app.post("/api/content/{content_id}")
 async def mark_content_completed(content_id: str):
@@ -130,8 +139,6 @@ async def mark_content_completed(content_id: str):
 
 
 ###teacher 
-
-
 
 
 @app.get("/api/studentlist/{class_id}/{subject_id}")

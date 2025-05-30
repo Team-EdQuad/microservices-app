@@ -58,7 +58,7 @@ async def get_avg_time_spent(subject_id: str, class_id: str):
     try:
         result = list(db["behavioral_analysis"].aggregate(pipeline))
 
-        # 👇 New line: Fetch total students in the class from the students collection
+        #  New line: Fetch total students in the class from the students collection
         total_students = db["student"].count_documents({"class_id": class_id})
 
         if not result:

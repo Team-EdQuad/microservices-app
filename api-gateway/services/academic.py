@@ -202,37 +202,36 @@ async def get_exam_marks(student_id: str):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Error fetching exam marks: {str(exc)}")
 
+
 async def upload_assignment_file(student_id: str, assignment_id: str, file: UploadFile):
     try:
-        print(f"Attempting to connect to: {ACADEMIC_SERVICE_URL}/submission/{student_id}/{assignment_id}")
-        async with httpx.AsyncClient() as client:
+        print(f"Starting upload for {student_id}/{assignment_id}")
+        async with httpx.AsyncClient(timeout=30.0) as client:
             files = {"file": (file.filename, await file.read(), file.content_type)}
             url = f"{ACADEMIC_SERVICE_URL}/submission/{student_id}/{assignment_id}"
-            print(f"Full URL: {url}")
+            
+            print(f"Sending request to: {url}")
             response = await client.post(url, files=files)
+            
+            print(f"Response status: {response.status_code}")
+            print(f"Response headers: {response.headers}")
+            
             response.raise_for_status()
-            return response.json()
+            
+            response_data = response.json()
+            print(f"Response data received successfully")
+            return response_data
+            
     except httpx.HTTPStatusError as exc:
-        print(f"HTTP Status Error: {exc.response.status_code} - {exc.response.text}")
+        print(f"HTTP Status Error: {exc.response.status_code}")
+        print(f"Response text: {exc.response.text}")
         raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except httpx.TimeoutException:
+        print("Request timeout occurred")
+        raise HTTPException(status_code=504, detail="Request timeout")
     except Exception as exc:
-        print(f"General Exception: {str(exc)}")
+        print(f"Unexpected error: {type(exc).__name__}: {str(exc)}")
         raise HTTPException(status_code=500, detail=f"Submission failed: {str(exc)}")
-
-
-
-# async def upload_assignment_file(student_id: str, assignment_id: str, file: UploadFile):
-#     try:
-#         async with httpx.AsyncClient() as client:
-#             files = {"file": (file.filename, await file.read(), file.content_type)}
-#             url = f"{ACADEMIC_SERVICE_URL}/submission/{student_id}/{assignment_id}"
-#             response = await client.post(url, files=files)
-#             response.raise_for_status()
-#             return response.json()
-#     except httpx.HTTPStatusError as exc:
-#         raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
-#     except Exception as exc:
-#         raise HTTPException(status_code=500, detail=f"Submission failed: {str(exc)}")
 
 
 async def mark_content_done(content_id: str):

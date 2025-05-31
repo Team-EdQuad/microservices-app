@@ -213,8 +213,6 @@ async def visualize_data(subject_id: str, class_id: str):
 
 
 
-
-
 # Prediction endpoint
 @router.post("/predict_active_time", response_model=PredictionOutput)
 async def predict_active_time(input_data: PredictionInput):

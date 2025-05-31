@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta,timezone
 from pymongo.collection import Collection
 from typing import Dict
@@ -8,6 +9,15 @@ from .services.predict_active_time import router as predict_router
 import traceback
 
 app = FastAPI(title="Behavioral Analysis API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Allow your frontend origin
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allow all headers
+)
+
 router = APIRouter()
 collection = db["behavioral_analysis"]
 

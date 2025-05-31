@@ -4,6 +4,7 @@ from pymongo.collection import Collection
 from typing import Dict
 from bson.son import SON
 from .services.database import db  
+from .services.predict_active_time import router as predict_router
 import traceback
 
 app = FastAPI(title="Behavioral Analysis API")
@@ -449,5 +450,11 @@ async def close_content_access(request_data: Dict):
             status_code=500, 
             detail=f"Internal server error: {str(e)}"
         )
+
+
+app.include_router(predict_router, prefix="/api")
+
+
+
 
 app.include_router(router)

@@ -66,8 +66,6 @@ async def serve_submission_file(submission_id: str):
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
-
-
 #view accessible subject and class  ( teacher )
 @router.get("/subjectNclass/{teacher_id}", response_model=SubjectClassResponse)
 async def get_subjectNclass(teacher_id: str):
@@ -237,8 +235,6 @@ async def upload_content(
         raise HTTPException(status_code=500, detail=f"Failed to upload content: {str(e)}")
       
 
-
-
 #view submission ( teacher )
 @router.get("/submission_view/{teacher_id}", response_model=List[SubmissionResponse])
 async def view_manual_submission(teacher_id: str):
@@ -283,7 +279,6 @@ async def view_manual_submission(teacher_id: str):
     return [SubmissionResponse(**submission) for submission in manual_submissions]
 
 
-
 @router.post("/update_submission_marks/{teacher_id}", response_model=SubmissionResponse)
 async def update_submission_marks(
     teacher_id: str,
@@ -316,7 +311,6 @@ async def update_submission_marks(
     # Return the updated submission
     updated_submission = db["submission"].find_one({"submission_id": submission_id})
     return SubmissionResponse(**updated_submission)
-
 
 
 @router.post("/update_exam_marks", response_model=dict)

@@ -9,6 +9,14 @@ import os
 import pickle
 from datetime import datetime
 from typing import Optional
+from .database import client
+
+
+
+
+COLLECTION_NAME = "active_time_prediction"
+DATABASE_NAME = "LMS"  # Define database name as a string
+
 
 # Configure logging
 logging.basicConfig(
@@ -175,6 +183,37 @@ class ModelStatus(BaseModel):
     model_loaded: bool
     model_info: Optional[dict] = None
     pickle_files_exist: bool
+
+
+# Corrected visualization endpoint
+@router.get("/visualize_data/{subject_id}/{class_id}")
+async def visualize_data(subject_id: str, class_id: str):
+    """Return x and y axis arrays for visualization filtered by subject_id and class_id"""
+    try:
+        # Use string "LMS" not variable LMS
+        db = client["LMS"]  # Or use db = client[DATABASE_NAME]
+        collection = db[COLLECTION_NAME]
+        
+        # Query filtered data
+        query = {"subject_id": subject_id, "class_id": class_id}
+        cursor = collection.find(query).sort("Weeknumber", 1)
+        
+        x_values = []  # Weeknumber
+        y_values = []  # TotalActiveTime
+        
+        for document in cursor:
+            x_values.append(document["Weeknumber"])
+            y_values.append(document["TotalActiveTime"])
+        
+        return {"x": x_values, "y": y_values}
+        
+    except Exception as e:
+        logger.error(f"Visualization endpoint error: {str(e)}")
+        return {"error": str(e)}
+
+
+
+
 
 # Prediction endpoint
 @router.post("/predict_active_time", response_model=PredictionOutput)

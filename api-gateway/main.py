@@ -21,7 +21,7 @@ from services import usermanagement
 from schemas.usermanagement import LoginRequest
 
 
-from services.academic import  get_student_list_by_class_and_subject,get_submission_file_by_id,get_assignment_file_by_id,get_content_by_id,get_content_file_by_id,create_assignment_request,upload_content_request,view_ungraded_manual_submissions,update_manual_marks,add_exam_marks_request,get_subject_names,get_student_content,get_all_assignments,get_assignment_by_id,get_assignment_marks,get_exam_marks, upload_assignment_file ,mark_content_done,get_subject_and_class_for_teacher
+from services.academic import  view_auto_graded_submissions_request,review_auto_graded_marks_request,get_student_list_by_class_and_subject,get_submission_file_by_id,get_assignment_file_by_id,get_content_by_id,get_content_file_by_id,create_assignment_request,upload_content_request,view_ungraded_manual_submissions,update_manual_marks,add_exam_marks_request,get_subject_names,get_student_content,get_all_assignments,get_assignment_by_id,get_assignment_marks,get_exam_marks, upload_assignment_file ,mark_content_done,get_subject_and_class_for_teacher
 from services.behavioural import get_model_status,load_model,model_train,active_time_prediction,Visualize_data_list,time_spent_on_resources,average_active_time,resource_access_frequency,content_access_start,content_access_close
 
 from services.attendance import attendanceRouter
@@ -119,22 +119,13 @@ async def submit_assignment_file(
     return await upload_assignment_file(student_id, assignment_id, file)
     
 
-
-# @app.post("/api/submission/{student_id}/{assignment_id}")
-# async def submit_assignment_file(
-#     student_id: str,
-#     assignment_id: str,
-#     file: UploadFile = File(...)
-# ):
-#     result = await upload_assignment_file(student_id, assignment_id, file)
-#     return {"message": "Submission successful", "data": result}
-
 @app.post("/api/content/{content_id}")
 async def mark_content_completed(content_id: str):
     success = await mark_content_done(content_id)
     if not success:
         raise HTTPException(status_code=404, detail="Content not found or not accessible")
     return {"message": "Content marked as completed"}
+
 
 
 ###teacher 
@@ -227,6 +218,19 @@ async def update_exam_marks(
 
     return await add_exam_marks_request(form_data)
 
+@app.get("/api/auto_graded_submissions/{teacher_id}")
+async def get_auto_graded_submissions(teacher_id: str):
+    return await view_auto_graded_submissions_request(teacher_id)
+
+
+@app.post("/api/review_auto_graded_marks/{teacher_id}")
+async def review_marks(
+    teacher_id: str,
+    submission_id: str = Form(...),
+    marks: float = Form(...),
+    action: str = Form(...)
+):
+    return await review_auto_graded_marks_request(teacher_id, submission_id, marks, action)
 
 
 

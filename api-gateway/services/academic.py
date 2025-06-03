@@ -362,3 +362,34 @@ async def add_exam_marks_request(form_data: dict):
         raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Error adding exam marks: {str(exc)}")
+
+
+async def view_auto_graded_submissions_request(teacher_id: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{ACADEMIC_SERVICE_URL}/auto_graded_submissions/{teacher_id}"
+            response = await client.get(url)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error fetching auto-graded submissions: {str(exc)}")
+
+
+async def review_auto_graded_marks_request(teacher_id: str, submission_id: str, marks: float, action: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{ACADEMIC_SERVICE_URL}/review_auto_graded_marks/{teacher_id}"
+            data = {
+                "submission_id": submission_id,
+                "marks": marks,
+                "action": action
+            }
+            response = await client.post(url, data=data)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error reviewing auto-graded marks: {str(exc)}")

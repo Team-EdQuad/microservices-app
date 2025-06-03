@@ -431,4 +431,92 @@ async def get_students_by_class_and_subject(class_id: str, subject_id: str):
 
 
 
+@router.get("/auto_graded_submissions/{teacher_id}", response_model=List[SubmissionResponse])
+async def view_auto_graded_submissions(teacher_id: str):
+    teacher_data = db["teacher"].find_one({"teacher_id": teacher_id})
+    if not teacher_data:
+        raise HTTPException(status_code=404, detail="Teacher not found")
+
+    subjects_classes = teacher_data.get("subjects_classes", [])
+    if not subjects_classes:
+        raise HTTPException(status_code=404, detail="No subjects or classes found for this teacher")
+
+    # Build a list of subject-class combinations
+    filters = []
+    for item in subjects_classes:
+        subject_id = item.get("subject_id")
+        class_ids = item.get("class_id", [])
+        for cls_id in class_ids:
+            filters.append({
+                "teacher_id": teacher_id,
+                "subject_id": subject_id,
+                "class_id": cls_id,
+                "grading_type": "auto"  # Only fetch auto-graded submissions
+            })
+
+    # Collect matching auto-graded submissions
+    auto_graded_submissions = []
+    for f in filters:
+        submissions_cursor = db["grading_submissions"].find(f)
+        for submission in submissions_cursor:
+            # Add assignment name
+            assignment = db["assignment"].find_one({"assignment_id": submission["assignment_id"]})
+            if assignment:
+                submission["assignment_name"] = assignment.get("assignment_name")
+            auto_graded_submissions.append(submission)
+
+    if not auto_graded_submissions:
+        raise HTTPException(status_code=404, detail="No auto-graded submissions found for review")
+
+    return [SubmissionResponse(**submission) for submission in auto_graded_submissions]
+
+
+@router.post("/review_auto_graded_marks/{teacher_id}", response_model=SubmissionResponse)
+async def review_auto_graded_marks(
+    teacher_id: str,
+    submission_id: str = Form(...),
+    marks: float = Form(...),
+    action: str = Form(...)  # "approve" or "modify"
+):
+    # Validate marks
+    if marks < 0 or marks > 100:
+        raise HTTPException(status_code=400, detail="Marks must be between 0 and 100.")
+    
+    # Validate action
+    if action not in ["approve", "modify"]:
+        raise HTTPException(status_code=400, detail="Action must be 'approve' or 'modify'")
+
+    # Fetch the auto-graded submission
+    submission = db["grading_submissions"].find_one({
+        "submission_id": submission_id,
+        "teacher_id": teacher_id,
+        "grading_type": "auto"
+    })
+
+    if not submission:
+        raise HTTPException(status_code=404, detail="Auto-graded submission not found")
+
+    try:
+        # Update marks and change grading_type to "manual"
+        update_data = {
+            "marks": marks,
+            "grading_type": "manual",
+            "reviewed_at": datetime.utcnow().isoformat(),
+            "review_action": action,
+            "original_auto_marks": submission.get("marks")  # Store original AI marks
+        }
+        
+        db["grading_submissions"].update_one(
+            {"submission_id": submission_id},
+            {"$set": update_data}
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update marks: {str(e)}")
+
+    # Return the updated submission
+    updated_submission = db["grading_submissions"].find_one({"submission_id": submission_id})
+    return SubmissionResponse(**updated_submission)
+
+
 

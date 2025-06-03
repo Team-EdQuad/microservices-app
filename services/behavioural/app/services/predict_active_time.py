@@ -15,7 +15,7 @@ from .database import client
 
 
 COLLECTION_NAME = "active_time_prediction"
-DATABASE_NAME = "LMS"  # Define database name as a string
+DATABASE_NAME = "LMS"  
 
 
 # Configure logging
@@ -185,7 +185,7 @@ class ModelStatus(BaseModel):
     pickle_files_exist: bool
 
 
-# Corrected visualization endpoint
+# visualization endpoint
 @router.get("/visualize_data/{subject_id}/{class_id}")
 async def visualize_data(subject_id: str, class_id: str):
     """Return x and y axis arrays for visualization filtered by subject_id and class_id"""

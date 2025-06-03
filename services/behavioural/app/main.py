@@ -400,4 +400,4 @@ async def close_content_access(request_data: Dict):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 app.include_router(router)
-app.include_router(predict_router, prefix="/api")
+app.include_router(predict_router, tags=["Endpoints prediction "])

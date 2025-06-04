@@ -1,10 +1,12 @@
 from pydantic import BaseModel, Field, EmailStr
 from typing import List
+from datetime import date
 
 class StudentRegistration(BaseModel):
     student_id: str = Field(..., pattern=r"^STU\d{3}$")
     first_name: str
     last_name: str
+    full_name: str
     email: EmailStr
     password: str
     gender: str = Field(..., pattern="^(male|female)$")
@@ -13,7 +15,8 @@ class StudentRegistration(BaseModel):
     class_id: str
     phone: str = Field(..., pattern=r"^\d{10}$")
     subject: List[str]
-    language: str
+    join_date: date
+    last_edit_date: date
     club_id: List[str] = []
     sport_id: List[str] = []
     role: str = "student"

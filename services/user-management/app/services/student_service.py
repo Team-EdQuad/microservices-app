@@ -3,21 +3,22 @@ from datetime import datetime
 from app.db.database import db
 from app.models.student_model import StudentRegistration
 import bcrypt  # for password hashing (Install it using pip install bcrypt)
+from datetime import datetime, time, date
 
 async def register_student(student: StudentRegistration):
     student_collection = db["student"]
     teacher_collection = db["teacher"]
     admin_collection = db["admin"]
-    subjects_collection = db["subjects"]
+    subjects_collection = db["subject"]
 
     # Subject count validation
-    subject_count = len(student.subject)
-    if 1 <= student.grade <= 9 and subject_count != 12:
-        raise HTTPException(status_code=400, detail="Grades 1–9 require exactly 12 subjects.")
-    elif 10 <= student.grade <= 11 and subject_count != 9:
-        raise HTTPException(status_code=400, detail="Grades 10–11 require exactly 9 subjects.")
-    elif 12 <= student.grade <= 13 and subject_count != 4:
-        raise HTTPException(status_code=400, detail="Grades 12–13 require exactly 4 subjects.")
+    # subject_count = len(student.subject)
+    # if 1 <= student.grade <= 9 and subject_count != 12:
+    #     raise HTTPException(status_code=400, detail="Grades 1–9 require exactly 12 subjects.")
+    # elif 10 <= student.grade <= 11 and subject_count != 9:
+    #     raise HTTPException(status_code=400, detail="Grades 10–11 require exactly 9 subjects.")
+    # elif 12 <= student.grade <= 13 and subject_count != 4:
+    #     raise HTTPException(status_code=400, detail="Grades 12–13 require exactly 4 subjects.")
 
     # Check for existing student_id/email/phone in all collections
     for collection in [student_collection, teacher_collection, admin_collection]:
@@ -33,8 +34,13 @@ async def register_student(student: StudentRegistration):
     student_data = student.dict()
     student_data["password"] = hashed_password.decode('utf-8')  # Store the hashed password
     student_data["full_name"] = f"{student.first_name} {student.last_name}"
-    student_data["register_date"] = datetime.utcnow().isoformat()
+    student_data["join_date"] = datetime.utcnow().date().isoformat()
+    student_data["last_edit_date"] = datetime.utcnow().date().isoformat()
     
+    for date_field in ["join_date", "last_edit_date"]:
+        if date_field in student_data and isinstance(student_data[date_field], date):
+            student_data[date_field] = datetime.combine(student_data[date_field], time.min)
+
     try:
         # Insert student into the database
         result = await student_collection.insert_one(student_data)

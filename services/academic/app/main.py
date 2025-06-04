@@ -13,6 +13,7 @@ genai.configure(api_key=API_KEY)
 
 app = FastAPI(title="Academic API")
 
+
 # ✅ ADD THIS CORS CONFIG
 app.add_middleware(
     CORSMiddleware,

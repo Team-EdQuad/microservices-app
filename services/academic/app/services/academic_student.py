@@ -12,14 +12,14 @@ from fastapi.responses import FileResponse
 
 
 
-
 UPLOAD_DIR = "uploads/submissions"
 os.makedirs(UPLOAD_DIR, exist_ok=True) 
 
 ALLOWED_EXTENSIONS = {"pdf", "txt"}  # Allowed file types
 
-
 router = APIRouter()
+
+
 @router.get("/content/{content_id}")
 async def get_content_by_id(content_id: str):
     try:
@@ -411,6 +411,17 @@ async def submit_assignment(student_id: str, assignment_id: str, file: UploadFil
     class_id = assignment.get("class_id")
     grading_type = assignment.get("grading_type")
     sample_answer = assignment.get("sample_answer")
+    assignment_name = assignment.get("assignment_name", "Unnamed Assignment")
+
+
+     # Fetch class name
+    class_doc = db["class"].find_one({"class_id": class_id})
+    class_name = class_doc.get("class_name", "Unknown Class") if class_doc else "Unknown Class"
+
+    # Fetch subject name
+    subject_doc = db["subject"].find_one({"subject_id": subject_id})
+    subject_name = subject_doc.get("subject_name", "Unknown Subject") if subject_doc else "Unknown Subject"
+
 
     # Check if a submission already exists for the same student and assignment
     existing_submission = db["submission"].find_one({"student_id": student_id, "assignment_id": assignment_id})
@@ -448,13 +459,15 @@ async def submit_assignment(student_id: str, assignment_id: str, file: UploadFil
     submission_data = {
         "submission_id": submission_id,
         "subject_id": subject_id,
+        "subject_name": subject_name,
         "content_file_path": file_path,
         "submit_time_date": datetime.utcnow().isoformat(),
-        "status": True,
         "class_id": class_id,
+        "class_name": class_name,
         "file_name": file.filename,
         "marks": marks,  # Marks assigned if auto-grading is enabled
         "assignment_id": assignment_id,
+        "assignment_name": assignment_name,
         "student_id": student_id,
         "teacher_id": teacher_id,
     }

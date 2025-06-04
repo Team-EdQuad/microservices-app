@@ -3,7 +3,7 @@ import os
 from datetime import datetime, timedelta
 import httpx 
 from fastapi.responses import JSONResponse
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 # from services.attendance.app.utils import schemas as attModSchemas
 
@@ -21,8 +21,8 @@ from services import usermanagement
 from schemas.usermanagement import LoginRequest
 
 
-from services.academic import  get_student_list_by_class_and_subject,get_submission_file_by_id,get_assignment_file_by_id,get_content_by_id,get_content_file_by_id,create_assignment_request,upload_content_request,view_ungraded_manual_submissions,update_manual_marks,add_exam_marks_request,get_subject_names,get_student_content,get_all_assignments,get_assignment_by_id,get_assignment_marks,get_exam_marks, upload_assignment_file ,mark_content_done,get_subject_and_class_for_teacher
-from services.behavioural import time_spent_on_resources,average_active_time,resource_access_frequency,content_access_start,content_access_close
+from services.academic import  view_auto_graded_submissions_request,review_auto_graded_marks_request,get_student_list_by_class_and_subject,get_submission_file_by_id,get_assignment_file_by_id,get_content_by_id,get_content_file_by_id,create_assignment_request,upload_content_request,view_ungraded_manual_submissions,update_manual_marks,add_exam_marks_request,get_subject_names,get_student_content,get_all_assignments,get_assignment_by_id,get_assignment_marks,get_exam_marks, upload_assignment_file ,mark_content_done,get_subject_and_class_for_teacher
+from services.behavioural import get_model_status,load_model,model_train,active_time_prediction,Visualize_data_list,time_spent_on_resources,average_active_time,resource_access_frequency,content_access_start,content_access_close
 
 from services.attendance import attendanceRouter
 
@@ -110,16 +110,14 @@ async def fetch_exam_marks(student_id: str):
     
 
 
-
-
 @app.post("/api/submission/{student_id}/{assignment_id}")
 async def submit_assignment_file(
     student_id: str,
     assignment_id: str,
     file: UploadFile = File(...)
 ):
-    result = await upload_assignment_file(student_id, assignment_id, file)
-    return {"message": "Submission successful", "data": result}
+    return await upload_assignment_file(student_id, assignment_id, file)
+    
 
 @app.post("/api/content/{content_id}")
 async def mark_content_completed(content_id: str):
@@ -129,9 +127,8 @@ async def mark_content_completed(content_id: str):
     return {"message": "Content marked as completed"}
 
 
+
 ###teacher 
-
-
 
 
 @app.get("/api/studentlist/{class_id}/{subject_id}")
@@ -221,6 +218,19 @@ async def update_exam_marks(
 
     return await add_exam_marks_request(form_data)
 
+@app.get("/api/auto_graded_submissions/{teacher_id}")
+async def get_auto_graded_submissions(teacher_id: str):
+    return await view_auto_graded_submissions_request(teacher_id)
+
+
+@app.post("/api/review_auto_graded_marks/{teacher_id}")
+async def review_marks(
+    teacher_id: str,
+    submission_id: str = Form(...),
+    marks: float = Form(...),
+    action: str = Form(...)
+):
+    return await review_auto_graded_marks_request(teacher_id, submission_id, marks, action)
 
 
 
@@ -255,6 +265,47 @@ async def close_content_access(
     content_id: str = Form(...)
 ):
     return await content_access_close(student_id, content_id)
+
+
+
+# 1. Visualization endpoint
+@app.get("/api/visualize_data/{subject_id}/{class_id}")
+async def Visualize(subject_id: str, class_id: str):
+   return await Visualize_data_list(subject_id, class_id)
+
+
+
+# 2. Prediction endpoint (POST with JSON body)
+@app.post("/api/predict_active_time/")
+async def Prediction(
+    Weeknumber: int = Form(...),
+    SpecialEventThisWeek: int = Form(...),
+    ResourcesUploadedThisWeek: int = Form(...)
+):
+    input_data = {
+        "Weeknumber": Weeknumber,
+        "SpecialEventThisWeek": SpecialEventThisWeek,
+        "ResourcesUploadedThisWeek": ResourcesUploadedThisWeek
+    }
+    return await active_time_prediction(input_data)
+
+
+# 3. Train model
+@app.post("/api/train_model/")
+async def TrainModel():
+    return await model_train()
+
+# 4. Load model
+@app.post("/api/load_model/")
+async def LoadModel():
+    return await load_model()
+
+# 5. Get model status
+@app.get("/api/model_status/")
+async def ModelStatus():
+    return await get_model_status()
+
+
 
 
 

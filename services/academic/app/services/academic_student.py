@@ -3,27 +3,55 @@ import os
 import uuid
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from typing import List
+
+from ..utils.grading_gemini import grade_answer
+from ..utils.grading_deepseek import grade_answer_deepseek
 from ..models.academic import AssignmentListResponse, AssignmentViewResponse, ContentResponse, MarksResponse, SubjectResponse,AssignmentMarksResponse, SubmissionResponse
 from .database import db
 from ..utils.file_utils import extract_text
-from ..utils.grading import grade_answer
+from ..utils.grading_gemini import grade_answer
 from fastapi.responses import FileResponse
+from .database import db
+from .google_drive import get_drive_service, FOLDER_IDS
+from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
+from ..utils.file_utils import extract_text
+from ..utils.grading_gemini import grade_answer
+import io
+import logging
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 
-
-
-UPLOAD_DIR = "uploads/submissions"
-os.makedirs(UPLOAD_DIR, exist_ok=True) 
-
+logger = logging.getLogger(__name__)
 ALLOWED_EXTENSIONS = {"pdf", "txt"}  # Allowed file types
 
 router = APIRouter()
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+def upload_to_drive(drive_service, file_metadata, media):
+    return drive_service.files().create(
+        body=file_metadata,
+        media_body=media,
+        fields='id'
+    ).execute()
+
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+def download_from_drive(drive_service, file_id):
+    request = drive_service.files().get_media(fileId=file_id)
+    file_io = io.BytesIO()
+    downloader = MediaIoBaseDownload(file_io, request)
+    done = False
+    while not done:
+        status, done = downloader.next_chunk()
+    file_io.seek(0)
+    return file_io
+
+
+
 @router.get("/content/{content_id}")
 async def get_content_by_id(content_id: str):
     try:
-        print(f"Looking up metadata for content_id: {content_id}")
+        
         content = db["content"].find_one({"content_id": content_id})
         
         if not content:
@@ -49,10 +77,8 @@ async def get_content_by_id(content_id: str):
 @router.get("/content/file/{content_id}")
 async def serve_content_file(content_id: str):
     try:
-        print(f"Looking up content_id: {content_id}")
         content = db["content"].find_one({"content_id": content_id})
-        print(f"Content found: {content}")
-
+        
         if not content:
             raise HTTPException(status_code=404, detail="Content not found")
 
@@ -76,7 +102,6 @@ async def serve_content_file(content_id: str):
         print(f"Unexpected error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
     
-
 @router.get("/assignment/file/{assignment_id}")
 async def serve_assignment_file(assignment_id: str):
     try:
@@ -136,7 +161,7 @@ async def get_assignment(assignment_id: str):
         assignment_response = AssignmentViewResponse(
             assignment_id=assignment.get("assignment_id"),
             assignment_name=assignment.get("assignment_name"),
-            assignment_file_path=assignment.get("assignment_file_path"),
+            assignment_file_id=assignment.get("assignment_file_id"),
             Deadline=assignment.get("deadline"),
             class_id=assignment.get("class_id"),
             subject_id=assignment.get("subject_id"),
@@ -222,7 +247,7 @@ async def get_content(student_id: str, subject_id: str):
             content_response = ContentResponse(
                 content_id=content.get("content_id"),
                 content_name=content.get("content_name"),
-                content_file_path=content.get("content_file_path"),
+                content_file_id=content.get("content_file_id"),
                 Date=upload_date,
                 description=content.get("description"),
                 class_id=content.get("class_id"),
@@ -242,7 +267,6 @@ async def get_content(student_id: str, subject_id: str):
 
 @router.get("/show_assignments/{student_id}/{subject_id}", response_model=AssignmentListResponse)
 async def show_assignments(student_id: str, subject_id: str):
-    # Step 1: Get student's class_id
     student = db["student"].find_one({"student_id": student_id}, {"_id": 0, "class_id": 1})
 
     if not student:
@@ -253,7 +277,6 @@ async def show_assignments(student_id: str, subject_id: str):
     if not class_id:
         raise HTTPException(status_code=404, detail="No class ID associated with this student")
 
-    # Step 2: Fetch all assignments with created_at
     assignments_cursor = db["assignment"].find(
         {"class_id": class_id, "subject_id": subject_id},
         {"_id": 0, "assignment_id": 1, "assignment_name": 1, "created_at": 1}
@@ -270,7 +293,7 @@ async def show_assignments(student_id: str, subject_id: str):
 #view assignment (after clicked)
 @router.get("/assignment/{assignment_id}", response_model=AssignmentViewResponse)
 async def get_assignment(assignment_id: str):
-    # Step 1: Fetch assignment by assignment_id only
+    
     assignment = db["assignment"].find_one(
         {"assignment_id": assignment_id},
         {"_id": 0}  # Exclude MongoDB internal ID
@@ -295,7 +318,7 @@ async def get_assignment(assignment_id: str):
         assignment_response = AssignmentViewResponse(
             assignment_id=assignment.get("assignment_id"),
             assignment_name=assignment.get("assignment_name"),
-            assignment_file_path=assignment.get("assignment_file_path"),
+            assignment_file_id=assignment.get("assignment_file_id"),
             Deadline=assignment.get("deadline"),
             class_id=assignment.get("class_id"),
             subject_id=assignment.get("subject_id"),
@@ -391,9 +414,6 @@ async def get_exam_marks(student_id: str):
 
     return marks_responses
 
-
-
-#Submission 
 @router.post("/submission/{student_id}/{assignment_id}", response_model=SubmissionResponse)
 async def submit_assignment(student_id: str, assignment_id: str, file: UploadFile = File(...)):
     # Validate file extension
@@ -413,8 +433,7 @@ async def submit_assignment(student_id: str, assignment_id: str, file: UploadFil
     sample_answer = assignment.get("sample_answer")
     assignment_name = assignment.get("assignment_name", "Unnamed Assignment")
 
-
-     # Fetch class name
+    # Fetch class name
     class_doc = db["class"].find_one({"class_id": class_id})
     class_name = class_doc.get("class_name", "Unknown Class") if class_doc else "Unknown Class"
 
@@ -422,73 +441,81 @@ async def submit_assignment(student_id: str, assignment_id: str, file: UploadFil
     subject_doc = db["subject"].find_one({"subject_id": subject_id})
     subject_name = subject_doc.get("subject_name", "Unknown Subject") if subject_doc else "Unknown Subject"
 
-
+    # Determine collection based on grading type
+    collection_name = "grading_submissions" if grading_type == "auto" else "submission"
+    
     # Check if a submission already exists for the same student and assignment
-    existing_submission = db["submission"].find_one({"student_id": student_id, "assignment_id": assignment_id})
-    if existing_submission:
-        # If a submission exists, delete the old file
-        old_file_path = existing_submission.get("content_file_path")
-        if old_file_path and os.path.exists(old_file_path):
-            os.remove(old_file_path)
-
-    # Generate unique submission ID (reuse existing one if available)
+    existing_submission = db[collection_name].find_one({"student_id": student_id, "assignment_id": assignment_id})
     submission_id = existing_submission.get("submission_id") if existing_submission else f"SUBM{uuid.uuid4().hex[:6].upper()}"
-
-    # Create file path
-    file_name = f"{submission_id}_{file.filename}"
-    file_path = os.path.join(UPLOAD_DIR, file_name)
-
+    
+    content = await file.read()
     try:
-        # Save uploaded file
-        with open(file_path, "wb") as f:
-            content = await file.read()
-            f.write(content)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
+        drive_service = get_drive_service()
+        file_metadata = {
+            'name': f"{submission_id}_{file.filename}",
+            'parents': [FOLDER_IDS["submissions"]],
+            'mimeType': file.content_type
+        }
+        media = MediaIoBaseUpload(io.BytesIO(content), mimetype=file.content_type)
+        file_response = upload_to_drive(drive_service, file_metadata, media)
+        google_drive_file_id = file_response.get('id')
+    
+        # AI Auto-Grading (if grading_type is 'auto')
+        marks = None
+        if grading_type == "auto" and sample_answer:
+            try:
+                file_io = download_from_drive(drive_service, google_drive_file_id)
+                student_text = extract_text(file_io, file.filename)
+                marks = grade_answer(sample_answer, student_text)
+            except Exception as e:
+                logger.error(f"Auto-grading failed for submission_id={submission_id}: {str(e)}")
+                raise HTTPException(status_code=500, detail=f"Auto-grading failed: {str(e)}")
+        
+        # Submission record
+        submission_data = {
+            "submission_id": submission_id,
+            "subject_id": subject_id,
+            "subject_name": subject_name,
+            "content_file_id": google_drive_file_id,
+            "submit_time_date": datetime.utcnow().isoformat(),
+            "class_id": class_id,
+            "class_name": class_name,
+            "file_name": file.filename,
+            "marks": marks,
+            "assignment_id": assignment_id,
+            "assignment_name": assignment_name,
+            "student_id": student_id,
+            "teacher_id": teacher_id,
+        }
 
-    # AI Auto-Grading (if grading_type is 'auto')
-    marks = None
-    if grading_type == "auto" and sample_answer:
-        try:
-            student_text = extract_text(file_path)
-            marks = grade_answer(sample_answer, student_text)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Auto-grading failed: {str(e)}")
+        # Add additional fields for auto-graded submissions
+        if grading_type == "auto":
+            submission_data.update({
+                "grading_type": "auto",
+                "auto_graded_at": datetime.utcnow().isoformat(),
+                "sample_answer_used": sample_answer
+            })
 
-    # Submission record
-    submission_data = {
-        "submission_id": submission_id,
-        "subject_id": subject_id,
-        "subject_name": subject_name,
-        "content_file_path": file_path,
-        "submit_time_date": datetime.utcnow().isoformat(),
-        "class_id": class_id,
-        "class_name": class_name,
-        "file_name": file.filename,
-        "marks": marks,  # Marks assigned if auto-grading is enabled
-        "assignment_id": assignment_id,
-        "assignment_name": assignment_name,
-        "student_id": student_id,
-        "teacher_id": teacher_id,
-    }
-
-    try:
         if existing_submission:
-            # Update the existing submission
-            db["submission"].update_one(
+            if existing_submission.get("content_file_id"):
+                try:
+                    drive_service.files().delete(fileId=existing_submission["content_file_id"]).execute()
+                except Exception as e:
+                    logger.warning(f"Failed to delete old file {existing_submission['content_file_id']}: {str(e)}")
+            # Update the existing submission in appropriate collection
+            db[collection_name].update_one(
                 {"submission_id": submission_id},
                 {"$set": submission_data}
             )
         else:
-            # Insert a new submission
-            db["submission"].insert_one(submission_data)
+            # Insert a new submission in appropriate collection
+            db[collection_name].insert_one(submission_data)
+            
+        return SubmissionResponse(**submission_data)
+        
     except Exception as e:
-        # Cleanup file if DB operation fails
-        if os.path.exists(file_path):
-            os.remove(file_path)
-        raise HTTPException(status_code=500, detail=f"Failed to save submission: {str(e)}")
-
-    return SubmissionResponse(**submission_data)
+        logger.error(f"[ERROR] Submitting submission_id={submission_id} -> {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to submit assignment: {str(e)}")
 
 
 

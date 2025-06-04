@@ -5,8 +5,6 @@ from fastapi.responses import StreamingResponse
 
 ACADEMIC_SERVICE_URL = "http://127.0.0.1:8002"
 
-
-
     
     
 async def get_student_list_by_class_and_subject(class_id, subject_id):
@@ -68,9 +66,6 @@ async def get_content_file_by_id(content_id: str):
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(exc)}")
     
 
-
-
-
 async def get_submission_file_by_id(submission_id):
     try:
         async with httpx.AsyncClient() as client:
@@ -99,12 +94,6 @@ async def get_submission_file_by_id(submission_id):
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(exc)}")
     
 
-
-
-
-
-
-
 async def get_assignment_file_by_id(assignment_id: str):
     try:
         async with httpx.AsyncClient() as client:
@@ -131,14 +120,6 @@ async def get_assignment_file_by_id(assignment_id: str):
     except Exception as exc:
         print(f"Exception: {str(exc)}")
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(exc)}")
-    
-
-
-
-
-
-
-
     
     
 async def get_subject_names(student_id: str):
@@ -211,28 +192,65 @@ async def get_assignment_marks(student_id: str):
 
 async def get_exam_marks(student_id: str):
     try:
-        async with httpx.AsyncClient() as client:
+        print(f"Fetching exam marks for student: {student_id}")
+        print(f"ACADEMIC_SERVICE_URL: {ACADEMIC_SERVICE_URL}")
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
             url = f"{ACADEMIC_SERVICE_URL}/exammarks/{student_id}"
+            print(f"Full request URL: {url}")
+            
             response = await client.get(url)
+            print(f"Response status: {response.status_code}")
+            print(f"Response headers: {dict(response.headers)}")
+            
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            print(f"Successfully retrieved {len(data)} exam records")
+            return data
+            
     except httpx.HTTPStatusError as exc:
+        print(f"HTTP Status Error: {exc.response.status_code}")
+        print(f"Error response: {exc.response.text}")
         raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except httpx.ConnectError as exc:
+        print(f"Connection Error: {str(exc)}")
+        raise HTTPException(status_code=503, detail=f"Service unavailable: {str(exc)}")
+    except httpx.TimeoutException as exc:
+        print(f"Timeout Error: {str(exc)}")
+        raise HTTPException(status_code=504, detail=f"Request timeout: {str(exc)}")
     except Exception as exc:
+        print(f"Unexpected error: {type(exc).__name__}: {str(exc)}")
         raise HTTPException(status_code=500, detail=f"Error fetching exam marks: {str(exc)}")
 
 
 async def upload_assignment_file(student_id: str, assignment_id: str, file: UploadFile):
     try:
-        async with httpx.AsyncClient() as client:
+        print(f"Starting upload for {student_id}/{assignment_id}")
+        async with httpx.AsyncClient(timeout=30.0) as client:
             files = {"file": (file.filename, await file.read(), file.content_type)}
             url = f"{ACADEMIC_SERVICE_URL}/submission/{student_id}/{assignment_id}"
+            
+            print(f"Sending request to: {url}")
             response = await client.post(url, files=files)
+            
+            print(f"Response status: {response.status_code}")
+            print(f"Response headers: {response.headers}")
+            
             response.raise_for_status()
-            return response.json()
+            
+            response_data = response.json()
+            print(f"Response data received successfully")
+            return response_data
+            
     except httpx.HTTPStatusError as exc:
+        print(f"HTTP Status Error: {exc.response.status_code}")
+        print(f"Response text: {exc.response.text}")
         raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except httpx.TimeoutException:
+        print("Request timeout occurred")
+        raise HTTPException(status_code=504, detail="Request timeout")
     except Exception as exc:
+        print(f"Unexpected error: {type(exc).__name__}: {str(exc)}")
         raise HTTPException(status_code=500, detail=f"Submission failed: {str(exc)}")
 
 
@@ -344,3 +362,34 @@ async def add_exam_marks_request(form_data: dict):
         raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Error adding exam marks: {str(exc)}")
+
+
+async def view_auto_graded_submissions_request(teacher_id: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{ACADEMIC_SERVICE_URL}/auto_graded_submissions/{teacher_id}"
+            response = await client.get(url)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error fetching auto-graded submissions: {str(exc)}")
+
+
+async def review_auto_graded_marks_request(teacher_id: str, submission_id: str, marks: float, action: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{ACADEMIC_SERVICE_URL}/review_auto_graded_marks/{teacher_id}"
+            data = {
+                "submission_id": submission_id,
+                "marks": marks,
+                "action": action
+            }
+            response = await client.post(url, data=data)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error reviewing auto-graded marks: {str(exc)}")

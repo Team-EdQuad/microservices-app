@@ -55,7 +55,16 @@ async def get_students_by_class():
     try:
         student_count = student_table.count_documents({})
         teacher_count = teacher_table.count_documents({})
-        active_today = student_login_table.count_documents({"login_time": {"$gte": datetime.now() - timedelta(days=1)}})
+        # active_today = student_login_table.count_documents({"timestamp": {"$gte": datetime.now() - timedelta(days=1)}})
+        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end = today_start + timedelta(days=1)
+
+        active_today = student_login_table.count_documents({
+            "timestamp": {
+                "$gte": today_start.strftime("%Y-%m-%d %H:%M:%S"),
+                "$lt": today_end.strftime("%Y-%m-%d %H:%M:%S")
+            }
+        })
 
         data= {
             "total_students": student_count,

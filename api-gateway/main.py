@@ -4,7 +4,12 @@ from datetime import datetime, timedelta
 import httpx 
 from fastapi.responses import JSONResponse
 from typing import Dict, List, Optional
+from fastapi import Depends,Request,Body,Form
+from fastapi.security import OAuth2PasswordBearer
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 
+import json
 # from services.attendance.app.utils import schemas as attModSchemas
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'services')))
@@ -16,9 +21,12 @@ from services.dashboard import get_student_progress, get_student_assignments,fil
 from services.dashboard import get_teacher_assignments, get_exam_marks_teacher, get_student_progress_teacher, get_weekly_attendance,get_all_Classes
 from services.dashboard import get_exam_marks_admin,  get_student_progress_admin, get_weekly_attendance_admin, get_stats, get_all_users
 
-from services import usermanagement
+from services.usermanagement import login_user, add_admin, add_student, add_teacher, delete_user,edit_profile, update_password, get_profile, serialize_dates
 
-from schemas.usermanagement import LoginRequest
+from schemas.usermanagement import LoginRequest, AdminCreate,StudentRegistration,TeacherCreate, UserProfileUpdate, UpdatePasswordRequest
+
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/user-management/login")
 
 
 from services.academic import  view_auto_graded_submissions_request,review_auto_graded_marks_request,get_student_list_by_class_and_subject,get_submission_file_by_id,get_assignment_file_by_id,get_content_by_id,get_content_file_by_id,create_assignment_request,upload_content_request,view_ungraded_manual_submissions,update_manual_marks,add_exam_marks_request,get_subject_names,get_student_content,get_all_assignments,get_assignment_by_id,get_assignment_marks,get_exam_marks, upload_assignment_file ,mark_content_done,get_subject_and_class_for_teacher
@@ -35,17 +43,76 @@ app = FastAPI(title="Microservices API Gateway")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Frontend URL
+    allow_origins=["*"],  # Frontend URL
+    # allow_origins=["http://localhost:5173"],  # Frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-#Non-Academic Routes
+
 # User-management
-@app.post("/api/user-management/login")
-async def login_user(credentials: LoginRequest):
-    return await usermanagement.login_user(credentials.dict())
+@app.post("/api/user-management/login/")
+async def api_login(username: str = Form(...), password: str = Form(...)):
+    credentials = {"username": username, "password": password}
+    return await login_user(credentials)
+
+
+@app.post("/api/user-management/add-student")
+async def api_add_student(
+    student_data: StudentRegistration,
+    token: str = Depends(oauth2_scheme)
+):
+    authorization = f"Bearer {token}"
+    return await add_student(student_data.dict(), authorization)
+
+@app.post("/api/user-management/add-admin")
+async def api_add_admin(admin_data: AdminCreate, token: str = Depends(oauth2_scheme)):
+    admin_dict = admin_data.dict()
+    admin_dict = serialize_dates(admin_dict)
+    return await add_admin(admin_dict, authorization=f"Bearer {token}")
+
+@app.post("/api/user-management/add-teacher")
+async def api_add_teacher(
+    teacher_data: TeacherCreate,
+    token: str = Depends(oauth2_scheme)
+):
+    authorization = f"Bearer {token}"
+    data_dict = teacher_data.dict()
+    return await add_teacher(data_dict, authorization)
+
+@app.delete("/api/user-management/delete-user/{role}/{user_custom_id}")
+async def api_delete_user(role: str, user_custom_id: str, token: str = Depends(oauth2_scheme)):
+    authorization = f"Bearer {token}"
+    return await delete_user(role, user_custom_id, authorization)
+
+@app.put("/api/user-management/edit-profile/{role}/{user_id}")
+async def api_edit_profile(
+    role: str,
+    user_id: str,
+    profile_update: UserProfileUpdate,
+    token: str = Depends(oauth2_scheme)
+):
+    authorization = f"Bearer {token}"
+    profile_dict = profile_update.dict()
+    return await edit_profile(role, user_id, profile_dict, authorization)
+
+@app.put("/api/user-management/update-password")
+async def api_update_password(
+    password_update: UpdatePasswordRequest,
+    token: str = Depends(oauth2_scheme)
+):
+    authorization = f"Bearer {token}"
+    return await update_password(password_update.dict(), authorization)
+
+@app.get("/api/user-management/profile")
+async def profile(token: str = Depends(oauth2_scheme)):
+    print(f"Received token in API Gateway: {token}")
+    auth_header = f"Bearer {token}"
+    profile_data = await get_profile(authorization=auth_header)
+    print(f"Profile data response: {profile_data}")
+    return profile_data
+
 
 #non-academic
 @app.get("/api/nonacademic/sports", response_model=list)
@@ -457,6 +524,6 @@ async def weekly_attendance_admin(class_id: str = "CLS001", year: int = datetime
     
 
 #Attendance
-app.include_router(attendanceRouter)
+app.include_router(attendanceRouter, prefix="/api")
     
 

@@ -1,5 +1,3 @@
-# app/routers/update_password.py
-
 from fastapi import APIRouter, HTTPException
 from app.models.update_password_model import UpdatePasswordRequest
 from app.services.update_password_service import update_user_password
@@ -15,6 +13,6 @@ async def update_password(request: UpdatePasswordRequest):
     
     return await update_user_password(request)
 
-@router.get("/")
-async def root():
-    return {"message": "Forgot Password"}
+# @router.get("/")
+# async def root():
+#     return {"message": "Forgot Password"}

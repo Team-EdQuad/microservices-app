@@ -14,3 +14,4 @@ async def verify_admin_token(token: str) -> bool:
     admin_collection = db["admin"]
     admin = await admin_collection.find_one({"token": token})
     return bool(admin)
+

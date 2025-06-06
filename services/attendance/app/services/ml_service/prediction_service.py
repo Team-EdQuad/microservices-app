@@ -1,5 +1,3 @@
-# app/services/ml_service/prediction_service.py
-
 import pandas as pd
 import joblib
 import os
@@ -7,7 +5,6 @@ from datetime import datetime, timedelta
 from app.utils.mongodb_connection import calendar_events
 
 # Load model and feature columns
-# Updated model paths
 BASE_DIR = os.path.dirname(__file__)
 MODEL_DIR = os.path.join(BASE_DIR, "models")
 
@@ -40,6 +37,20 @@ async def predict_attendance(class_id: str, subject_id: str, target_date: dateti
 
     # Filter events on target date
     events_today = [e for e in events if e["date"].date() == target_date.date()]
+
+    # Check if school is closed on that day
+    if events_today and events_today[0]["features"]["is_school_day"] == 0:
+        return {
+            "class_id": class_id,
+            "subject_id": subject_id,
+            "date": target_date.strftime("%Y-%m-%d"),
+            "predicted_attendance_rate": "school closed",
+            "features_used": {
+                "is_event_day": events_today[0]["features"]["is_event_day"],
+                "is_exam_week": events_today[0]["features"]["is_exam_week"],
+                "is_school_day": events_today[0]["features"]["is_school_day"]
+            }
+        }
 
     # Calculate features
     days_until_next_holiday, days_since_last_holiday = calculate_holiday_distances(events, target_date)

@@ -12,10 +12,16 @@ client = AsyncIOMotorClient(uri)
 
 db = client.LMS
 
-attendance_store = db["attendance_store_test"] 
+
+attendance_store = db["attendance_store"] 
+# attendance_store = db["attendance_store_test"] 
 student = db["student_test"]
-class_attendance_summery = db["class_attendance_summery"]
-student_attendance_summery = db["student_attendance_summery"]
+class_attendance_summery = db["class_attendance_summery_test"]
+# class_attendance_summery = db["class_attendance_summery"]
+student_attendance_summery = db["student_attendance_summery_test"]
+# student_attendance_summery = db["student_attendance_summery"]
 document_store = db["document_store"]
 sports = db["sports"]
 clubs = db["clubs"]
+
+calendar_events = db["calendar_events"]

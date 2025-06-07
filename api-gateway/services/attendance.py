@@ -5,7 +5,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Dict
 
-ATTENDANCE_SERVICE_URL = "http://127.0.0.1:8004"
+# ATTENDANCE_SERVICE_URL = "http://127.0.0.1:8004"
+ATTENDANCE_SERVICE_URL = "http://attendance:8000"
 
 attendanceRouter = APIRouter(
     tags=["Attendance Service"],

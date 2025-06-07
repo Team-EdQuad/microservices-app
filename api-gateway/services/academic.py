@@ -3,7 +3,8 @@ import httpx
 from fastapi import HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
-ACADEMIC_SERVICE_URL = "http://127.0.0.1:8002"
+# ACADEMIC_SERVICE_URL = "http://127.0.0.1:8002"
+ACADEMIC_SERVICE_URL = "http://academic:8000"
 
     
     

@@ -2,8 +2,9 @@ import httpx
 from fastapi import HTTPException
 import logging
 
-BEHAVIOURAL_SERVICE_URL = "http://127.0.0.1:8005"
+# BEHAVIOURAL_SERVICE_URL = "http://127.0.0.1:8005"
 
+BEHAVIOURAL_SERVICE_URL = "http://behavioural:8000"
 
 
 async def time_spent_on_resources(subject_id, class_id):

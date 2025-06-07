@@ -1,7 +1,9 @@
 import httpx
 from fastapi import HTTPException
 
-NON_ACADEMIC_SERVICE_URL = "http://127.0.0.1:8003"
+# NON_ACADEMIC_SERVICE_URL = "http://127.0.0.1:8003"
+
+NON_ACADEMIC_SERVICE_URL = "http://non-academic:8000"
 
 async def get_all_sports():
     try:

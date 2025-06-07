@@ -3,7 +3,8 @@ from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 
 
-DASHBOARD_SERVICE_URL = "http://127.0.0.1:8006"
+# DASHBOARD_SERVICE_URL = "http://127.0.0.1:8006"
+DASHBOARD_SERVICE_URL = "http://dashboard:8000"
 
 
 #---------------Student Dashboard Routes------------------

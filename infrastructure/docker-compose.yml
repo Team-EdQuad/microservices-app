@@ -58,56 +58,56 @@ services:
     build: ../services/user-management
     ports:
       - "8001:8000"
-    depends_on:
-      - mongo
+    # depends_on:
+    #   - mongo
 
   academic:
     build: ../services/academic
     ports:
       - "8002:8000"
-    depends_on:
-      - mongo
+    # depends_on:
+    #   - mongo
 
   non-academic:
     build: ../services/non-academic
     ports:
       - "8003:8000"
-    depends_on:
-      - mongo
+    # depends_on:
+    #   - mongo
 
   attendance:
     build: ../services/attendance
     ports:
       - "8004:8000"
-    depends_on:
-      - mongo
+    # depends_on:
+    #   - mongo
 
   behavioural:
     build: ../services/behavioural
     ports:
       - "8005:8000"
-    depends_on:
-      - mongo
+    # depends_on:
+    #   - mongo
 
   calendar:
     build: ../services/calendar
     ports:
       - "8007:8000"
-    depends_on:
-      - mongo
+    # depends_on:
+    #   - mongo
 
   dashboard:
     build: ../services/dashboard
     ports:
       - "8006:8000"
-    depends_on:
-      - mongo
+    # depends_on:
+    #   - mongo
 
-  mongo:
-    image: mongo:6
-    ports:
-      - "27017:27017"
-    volumes:
-      - ../database/mongo/data:/data/db
-    restart: always
+  # mongo:
+  #   image: mongo:6
+  #   ports:
+  #     - "27017:27017"
+  #   volumes:
+  #     - ../database/mongo/data:/data/db
+  #   restart: always
 

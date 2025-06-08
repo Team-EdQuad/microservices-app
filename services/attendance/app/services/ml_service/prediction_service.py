@@ -2,7 +2,7 @@ import pandas as pd
 import joblib
 import os
 from datetime import datetime, timedelta
-from app.utils.mongodb_connection import calendar_events
+from app.utils.mongodb_connection import calendar_events, attendance_store
 
 # Load model and feature columns
 BASE_DIR = os.path.dirname(__file__)
@@ -44,7 +44,7 @@ async def predict_attendance(class_id: str, subject_id: str, target_date: dateti
             "class_id": class_id,
             "subject_id": subject_id,
             "date": target_date.strftime("%Y-%m-%d"),
-            "predicted_attendance_rate": "school closed",
+            "predicted_attendance_rate": -1,  # -1 indicates school is closed
             "features_used": {
                 "is_event_day": events_today[0]["features"]["is_event_day"],
                 "is_exam_week": events_today[0]["features"]["is_exam_week"],
@@ -131,3 +131,4 @@ def calculate_school_days_in_week(events, current_date):
             count += 1
 
     return count
+

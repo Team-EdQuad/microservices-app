@@ -23,6 +23,11 @@ from app.api.get_nonacadamic_subjects_router import allrouter as get_all_nonacad
 from app.api.attendance_prediction_router import router as prediction_router
 from app.api.store_calendar_event_router import router as calendar_event_router
 from app.api.get_daily_attendance_router import router as daily_attendance_router
+
+from app.services.dashboard_services.get_monthly_summary import router as monthly_summary_router
+from app.services.dashboard_services.get_weekly_summary import router as weekly_summary_router
+from app.services.dashboard_services.get_daily_summary import router as daily_summary_router
+
 # from .ml.routes import router as ml_router         # this is for model training and prediction 
 
 # @asynccontextmanager
@@ -62,6 +67,11 @@ app.include_router(get_all_nonacadamic_subjects_router)
 app.include_router(prediction_router)
 app.include_router(calendar_event_router)
 app.include_router(daily_attendance_router)
+
+app.include_router(monthly_summary_router)
+app.include_router(weekly_summary_router)
+app.include_router(daily_summary_router)
+
 # app.include_router(ml_router, prefix="/ml", tags=["Machine Learning"])
 
 

@@ -43,9 +43,13 @@ app = FastAPI(title="Microservices API Gateway")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Frontend URL
-    # allow_origins=["http://localhost:5173"],  # Frontend URL
-    allow_credentials=True,
+    # allow_origins=["*"],  # Frontend URL
+    # # allow_origins=["http://localhost:5173"],  # Frontend URL
+    # allow_credentials=True,
+    allow_origins=[
+    "http://localhost:3000",
+    "http://167.71.225.152:3000"
+    ]
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -1,13 +1,10 @@
 import httpx
 from fastapi import HTTPException, Request, APIRouter, Depends
 from typing import Optional
-<<<<<<< HEAD
-=======
 import json
 from datetime import date
 # from app.services.auth_service import get_current_user
 # from app.models.admin_model import AdminModel
->>>>>>> dev
 
 USER_MANAGEMENT_SERVICE_URL = "http://127.0.0.1:8001"
 
@@ -44,8 +41,6 @@ async def login_user(credentials: dict):
         raise HTTPException(status_code=exc.response.status_code, detail="Login failed")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-<<<<<<< HEAD
-=======
 
 # --- Add Admin ---
 async def add_admin(admin_data: dict, authorization: str = None):
@@ -238,4 +233,3 @@ def serialize_dates(data: dict):
         elif isinstance(value, list):
             data[key] = [v.isoformat() if isinstance(v, date) else v for v in value]
     return data
->>>>>>> dev

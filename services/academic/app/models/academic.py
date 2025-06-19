@@ -10,7 +10,7 @@ class SubjectResponse(BaseModel):
 class ContentResponse(BaseModel):
     content_id: str
     content_name: str
-    content_file_path: Optional[str] = None  # Optional field
+    content_file_id: Optional[str] = None  # Optional field
     Date: Optional[datetime] = None
     description: Optional[str] = None
     class_id: str
@@ -46,17 +46,19 @@ class SubjectClassResponse(BaseModel):
     subjects_classes: List[SubjectWithClasses]
 
 
-
 #student submission
 class SubmissionResponse(BaseModel):
     submission_id: str
     subject_id: str
-    content_file_path: str
+    subject_name: Optional[str] = None  
+    content_file_id: str
     submit_time_date: datetime
     class_id: str
+    class_name: Optional[str] = None
     file_name: str
     marks: Optional[int] = None
     assignment_id: str
+    assignment_name: Optional[str] = None 
     student_id: str
     teacher_id: str
 
@@ -69,22 +71,18 @@ class AssignmentItem(BaseModel):
 # List response
 class AssignmentListResponse(BaseModel):
     assignments: List[AssignmentItem]
-
-
+    
 
 #student assignment view
 class AssignmentViewResponse(BaseModel):
     assignment_id: str
     assignment_name: str
-    assignment_file_path : str
+    assignment_file_id : str
     Deadline: datetime
     class_id: str
     subject_id: str
     description: Optional[str] = None
    
-
-
-
 
 #teacher assignment creation
 class AssignmentResponse(BaseModel):
@@ -92,7 +90,7 @@ class AssignmentResponse(BaseModel):
     assignment_name: str
     description: str
     deadline: datetime
-    assignment_file_path: str
+    assignment_file_id: str
     class_id: str
     subject_id: str
     teacher_id: str
@@ -114,7 +112,7 @@ class AssignmentMarksResponse(BaseModel):
 class ContentUploadResponse(BaseModel):
     content_id: str
     content_name: str
-    content_file_path: str
+    content_file_id: str
     upload_date: str
     description: str
     class_id: str
@@ -137,3 +135,10 @@ class ExamMarksResponse(BaseModel):
     class_name: Optional[str] = None  # This will be fetched from DB
     exam_marks: List[SubjectExams]
     
+
+class StudentResponse(BaseModel):
+    student_id: str
+    full_name: str
+
+class StudentsResponse(BaseModel):
+    students: List[StudentResponse]

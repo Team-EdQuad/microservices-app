@@ -1,19 +1,17 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .services import academic_student, academic_teacher
-
 import os
 import google.generativeai as genai
 from dotenv import load_dotenv
 
 # Load .env
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
-API_KEY = os.getenv("GEMINI_API_KEY")
-genai.configure(api_key=API_KEY)
+
 
 app = FastAPI(title="Academic API")
 
-# ✅ ADD THIS CORS CONFIG
+# CORS configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],

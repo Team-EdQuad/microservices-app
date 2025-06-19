@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Form
 from pydantic import BaseModel
 from user_agents import parse
 import datetime
@@ -95,19 +95,24 @@ async def save_login_details(username: str, user_id: str, role: str, user_key: s
     await collection.insert_one(log_entry)
 
 @router.post("/login")
-async def login(request: LoginRequest, req: Request):
-    username = request.username
-    password = request.password
-
+async def login(req: Request, username: str = Form(...), password: str = Form(...)):
     user, role, user_key = await is_valid_user(username, password)
     if user:
-        # Generate JWT token for valid user
-        token = create_access_token(data={"sub": username, "role": role})
+        # Use ObjectId string as 'sub' in the token
+        # token = create_access_token(data={"sub": str(user.get("_id")), "role": role})
+        # user_id_value = str(user.get("_id")) if role != "student" else user.get("student_id")
+        # token = create_access_token(data={"sub": user_id_value, "role": role})
+        user_id_value = user.get(f"{role}_id")  # e.g., admin_id, teacher_id, student_id
+        token = create_access_token(data={
+            "sub": user_id_value,
+            "role": role
+        })
+
         
         # Save login details to the database
         await save_login_details(
             username=username,
-            user_id=str(user.get("_id")),
+            user_id=user_id_value,
             role=role,
             user_key=user_key,
             status="success",

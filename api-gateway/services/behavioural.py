@@ -3,7 +3,6 @@ from fastapi import HTTPException
 import logging
 
 # BEHAVIOURAL_SERVICE_URL = "http://127.0.0.1:8005"
-
 BEHAVIOURAL_SERVICE_URL = "http://behavioural:8000"
 
 

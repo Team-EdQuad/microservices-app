@@ -7,7 +7,6 @@ from datetime import date
 # from app.models.admin_model import AdminModel
 
 # USER_MANAGEMENT_SERVICE_URL = "http://127.0.0.1:8001"
-
 USER_MANAGEMENT_SERVICE_URL = "http://user-management:8000"
 
 router = APIRouter()

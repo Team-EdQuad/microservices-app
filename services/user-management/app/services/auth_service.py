@@ -4,7 +4,7 @@ from bson import ObjectId
 
 from passlib.context import CryptContext
 from app.db.database import db  # MongoDB client
-import jwt
+from jose import jwt
 from dateutil.parser import parse
 from datetime import datetime, timedelta,date
 from app.models.admin_model import AdminModel

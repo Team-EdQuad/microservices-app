@@ -39,7 +39,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-#Non-Academic Routes
 # User-management
 @app.post("/api/user-management/login")
 async def login_user(credentials: LoginRequest):

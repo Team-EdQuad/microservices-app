@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "edquad",
+  "private_key_id": "23435052a937f0abefcc3bf6ce108aa149243f9a",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQC+oGJKF8Hb0jds\nWzJ4tHGf9KAxx3oPAHS5+4o37ojeRx0VTGSSU9ePQ0turrgeejroiaa1Q7+sdJ37\nJK1OCykutr6r35J9h0DW2vfLmcrcTDx3bHL4dCSp+ljcu2QFib6gcqOwboKUqnuA\nPB+hYcA9iDG1mcrd0OSwveu9BmNRoB/UjK7VKQodxQWiz8I7YtyaCkDwkh7BSQvF\n4qLGCEce8JYLhQtLiaWkk3ffXeWlbFMdHJKQyV8RXa7g7gnGuuozsYf4swS29VNA\n7jq+U07TpUsOiL565H6iDA3l/xfbBpBLhZdltN3PIWaxFwhxlWb3qit1STeH/YAL\nc7ejgK7VAgMBAAECggEAGlLXf9fMA2kCEkp9q8FvN2F2halAJ7YuaEheC986s0cq\nsvg7oyFE0Rm/3ubtsfe7DsWDaeCTJWNtNXMZI3/TDgpaRi23cvIsd/8A3PK92rIE\nX5FwRvLy5S4W+1Q9Oa6NzmZGSGTaT2FDcK/cxlJTU6vtAWDdbMgd7HItjYrGSE0R\nT36sRyNKQ7Dt6ioOBrc+CD8B0VyVVGch86DNVNFAQcazP2d8Yk+ztuNeYwTnDxG3\nwFyOpq0wb7fr5Ow58hW/5CdEpaT/9+bdASFlcdeWdJ8KrA/YBtGGqLr8BcMeVAbX\n9e0dMf9vcRSuj9UsPqwnJAn8sO6lHVKBCRJ08pEhgQKBgQDjAiOjdipplJ5+t89q\noUsOUiASayxj/kY4D/cIiEM1TA3H2CeFjiUpQ9hvyX/iARObfhcDaD4c4LS/Sxr/\nIJPjTMbfyjh/9uzCRCnwdTc/3MaFbV6Z16zgYQ5IuTjiWx+e5xn7hqpDHxtAU9hF\nMkqjoryiew54hkBn7ttZ6HkNpQKBgQDW+MSzoRYCYcwhycr8qi5NIrdDRgXCbZIB\n2p2sErM33pHf9kzzuf7gjgQlfkR39cq/mJBAXySZzGZNTjKSTlt45w2150LcMF33\n5Y9R8demv392u711+RwxvI9tsIESgQ6aIeow6fFGUf5aSP+8hOySVS3IfBZBEpvR\ndke/Lfy1cQKBgHSUDKlNbcp6wEpjKumfm2PnWQEceNeBJZ501HBVSe58+DbBEsrL\njNn8NZJy8HGoC+G2hysAxaUe4LO8ZkjO+iOoshkLSKiurje1ubP6/jyVrH2pBQQM\ndoNkVGmUdVoJYdvA4t8A8T83Ik+Ov2oJwbr3P9hRScUrbLfzOkKZ2FDhAoGAdgy0\nUARUxsgXxjI/QxLdTESVKN9KCGQNOvFnhnfabQLPTpK93VW1TnEOe9xkExAp358T\nEBZvTfn979PSV5+qAbG4SL0PbUUuRRSN6K0LBKnCgFxGhYNf5Twr80trBdNTRnb7\nWRMPCNO7/q55qXfBRfZ6ps7llaR3ZsYyTh0d2jECgYB95uJmkTbSevEcvDJPBSe6\nfASotBQtNPW3mugi5qwcj3D+jNV+JZNhEm+S+UbE9jT6x1xPD2EBYgalo/AL8MRp\nb1C7y77NaiAXid4sEtG4agBiBdnJouWzbgshJsLgv9XZ77JKOWqTDbzje4Ow+1g5\nFYEe6IUULLfiia9jj8nGBQ==\n-----END PRIVATE KEY-----\n",
+  "client_email": "edquad-drive-api@edquad.iam.gserviceaccount.com",
+  "client_id": "109220702168233722770",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/edquad-drive-api%40edquad.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

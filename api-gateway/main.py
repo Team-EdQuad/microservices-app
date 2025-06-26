@@ -3,8 +3,13 @@ import os
 from datetime import datetime, timedelta
 import httpx 
 from fastapi.responses import JSONResponse
-from typing import List, Optional
+from typing import Dict, List, Optional
+from fastapi import Depends,Request,Body,Form
+from fastapi.security import OAuth2PasswordBearer
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 
+import json
 # from services.attendance.app.utils import schemas as attModSchemas
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'services')))
@@ -16,13 +21,16 @@ from services.dashboard import get_student_progress, get_student_assignments,fil
 from services.dashboard import get_teacher_assignments, get_exam_marks_teacher, get_student_progress_teacher, get_weekly_attendance,get_all_Classes
 from services.dashboard import get_exam_marks_admin,  get_student_progress_admin, get_weekly_attendance_admin, get_stats, get_all_users
 
-from services import usermanagement
+from services.usermanagement import login_user, add_admin, add_student, add_teacher, delete_user,edit_profile, update_password, get_profile, serialize_dates
 
-from schemas.usermanagement import LoginRequest
+from schemas.usermanagement import LoginRequest, AdminCreate,StudentRegistration,TeacherCreate, UserProfileUpdate, UpdatePasswordRequest
 
 
-from services.academic import  get_assignment_file_by_id,get_content_by_id,get_content_file_by_id,create_assignment_request,upload_content_request,view_ungraded_manual_submissions,update_manual_marks,add_exam_marks_request,get_subject_names,get_student_content,get_all_assignments,get_assignment_by_id,get_assignment_marks,get_exam_marks, upload_assignment_file ,mark_content_done,get_subject_and_class_for_teacher
-from services.behavioural import time_spent_on_resources,average_active_time,resource_access_frequency,content_access_start,content_access_close
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/user-management/login")
+
+
+from services.academic import  view_auto_graded_submissions_request,review_auto_graded_marks_request,get_student_list_by_class_and_subject,get_submission_file_by_id,get_assignment_file_by_id,get_content_by_id,get_content_file_by_id,create_assignment_request,upload_content_request,view_ungraded_manual_submissions,update_manual_marks,add_exam_marks_request,get_subject_names,get_student_content,get_all_assignments,get_assignment_by_id,get_assignment_marks,get_exam_marks, upload_assignment_file ,mark_content_done,get_subject_and_class_for_teacher
+from services.behavioural import get_model_status,load_model,model_train,active_time_prediction,Visualize_data_list,time_spent_on_resources,average_active_time,resource_access_frequency,content_access_start,content_access_close
 
 from services.attendance import attendanceRouter
 
@@ -30,6 +38,15 @@ app = FastAPI(title="Microservices API Gateway")
 
 # app.include_router(attendanceRouter)
 
+
+# app.add_middleware(
+#     CORSMiddleware,
+#     # allow_origins=["*"],  # Frontend URL
+#     allow_origins=["http://localhost:5173"],  # Frontend URL
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
 
 app.add_middleware(
     CORSMiddleware,
@@ -40,9 +57,67 @@ app.add_middleware(
 )
 
 # User-management
-@app.post("/api/user-management/login")
-async def login_user(credentials: LoginRequest):
-    return await usermanagement.login_user(credentials.dict())
+@app.post("/api/user-management/login/")
+async def api_login(username: str = Form(...), password: str = Form(...)):
+    credentials = {"username": username, "password": password}
+    return await login_user(credentials)
+
+
+@app.post("/api/user-management/add-student")
+async def api_add_student(
+    student_data: StudentRegistration,
+    token: str = Depends(oauth2_scheme)
+):
+    authorization = f"Bearer {token}"
+    return await add_student(student_data.dict(), authorization)
+
+@app.post("/api/user-management/add-admin")
+async def api_add_admin(admin_data: AdminCreate, token: str = Depends(oauth2_scheme)):
+    admin_dict = admin_data.dict()
+    admin_dict = serialize_dates(admin_dict)
+    return await add_admin(admin_dict, authorization=f"Bearer {token}")
+
+@app.post("/api/user-management/add-teacher")
+async def api_add_teacher(
+    teacher_data: TeacherCreate,
+    token: str = Depends(oauth2_scheme)
+):
+    authorization = f"Bearer {token}"
+    data_dict = teacher_data.dict()
+    return await add_teacher(data_dict, authorization)
+
+@app.delete("/api/user-management/delete-user/{role}/{user_custom_id}")
+async def api_delete_user(role: str, user_custom_id: str, token: str = Depends(oauth2_scheme)):
+    authorization = f"Bearer {token}"
+    return await delete_user(role, user_custom_id, authorization)
+
+@app.put("/api/user-management/edit-profile/{role}/{user_id}")
+async def api_edit_profile(
+    role: str,
+    user_id: str,
+    profile_update: UserProfileUpdate,
+    token: str = Depends(oauth2_scheme)
+):
+    authorization = f"Bearer {token}"
+    profile_dict = profile_update.dict()
+    return await edit_profile(role, user_id, profile_dict, authorization)
+
+@app.put("/api/user-management/update-password")
+async def api_update_password(
+    password_update: UpdatePasswordRequest,
+    token: str = Depends(oauth2_scheme)
+):
+    authorization = f"Bearer {token}"
+    return await update_password(password_update.dict(), authorization)
+
+@app.get("/api/user-management/profile")
+async def profile(token: str = Depends(oauth2_scheme)):
+    print(f"Received token in API Gateway: {token}")
+    auth_header = f"Bearer {token}"
+    profile_data = await get_profile(authorization=auth_header)
+    print(f"Profile data response: {profile_data}")
+    return profile_data
+
 
 #non-academic
 @app.get("/api/nonacademic/sports", response_model=list)
@@ -107,16 +182,14 @@ async def fetch_exam_marks(student_id: str):
     
 
 
-
-
 @app.post("/api/submission/{student_id}/{assignment_id}")
 async def submit_assignment_file(
     student_id: str,
     assignment_id: str,
     file: UploadFile = File(...)
 ):
-    result = await upload_assignment_file(student_id, assignment_id, file)
-    return {"message": "Submission successful", "data": result}
+    return await upload_assignment_file(student_id, assignment_id, file)
+    
 
 @app.post("/api/content/{content_id}")
 async def mark_content_completed(content_id: str):
@@ -126,11 +199,27 @@ async def mark_content_completed(content_id: str):
     return {"message": "Content marked as completed"}
 
 
+
 ###teacher 
+
+
+@app.get("/api/studentlist/{class_id}/{subject_id}")
+async def get_student_list(class_id: str, subject_id: str):
+    return await get_student_list_by_class_and_subject(class_id, subject_id)
+
+
+@app.get("/api/submission/file/{submission_id}")
+async def get_submission_file(submission_id: str):
+    return await get_submission_file_by_id(submission_id)
+
+
+
 
 @app.get("/api/subjectNclass/{teacher_id}")
 async def get_subject_and_class(teacher_id: str):
     return await get_subject_and_class_for_teacher(teacher_id)
+
+
 @app.post("/api/assignmentcreate/{class_id}/{subject_id}/{teacher_id}")
 async def create_assignment(
     class_id: str,
@@ -201,6 +290,19 @@ async def update_exam_marks(
 
     return await add_exam_marks_request(form_data)
 
+@app.get("/api/auto_graded_submissions/{teacher_id}")
+async def get_auto_graded_submissions(teacher_id: str):
+    return await view_auto_graded_submissions_request(teacher_id)
+
+
+@app.post("/api/review_auto_graded_marks/{teacher_id}")
+async def review_marks(
+    teacher_id: str,
+    submission_id: str = Form(...),
+    marks: float = Form(...),
+    action: str = Form(...)
+):
+    return await review_auto_graded_marks_request(teacher_id, submission_id, marks, action)
 
 
 
@@ -235,6 +337,47 @@ async def close_content_access(
     content_id: str = Form(...)
 ):
     return await content_access_close(student_id, content_id)
+
+
+
+# 1. Visualization endpoint
+@app.get("/api/visualize_data/{subject_id}/{class_id}")
+async def Visualize(subject_id: str, class_id: str):
+   return await Visualize_data_list(subject_id, class_id)
+
+
+
+# 2. Prediction endpoint (POST with JSON body)
+@app.post("/api/predict_active_time/")
+async def Prediction(
+    Weeknumber: int = Form(...),
+    SpecialEventThisWeek: int = Form(...),
+    ResourcesUploadedThisWeek: int = Form(...)
+):
+    input_data = {
+        "Weeknumber": Weeknumber,
+        "SpecialEventThisWeek": SpecialEventThisWeek,
+        "ResourcesUploadedThisWeek": ResourcesUploadedThisWeek
+    }
+    return await active_time_prediction(input_data)
+
+
+# 3. Train model
+@app.post("/api/train_model/")
+async def TrainModel():
+    return await model_train()
+
+# 4. Load model
+@app.post("/api/load_model/")
+async def LoadModel():
+    return await load_model()
+
+# 5. Get model status
+@app.get("/api/model_status/")
+async def ModelStatus():
+    return await get_model_status()
+
+
 
 
 
@@ -386,5 +529,6 @@ async def weekly_attendance_admin(class_id: str = "CLS001", year: int = datetime
     
 
 #Attendance
-app.include_router(attendanceRouter)
+app.include_router(attendanceRouter, prefix="/api")
     
+

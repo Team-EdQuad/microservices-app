@@ -9,6 +9,7 @@ def grade_answer(teacher_answer: str, student_answer: str) -> int:
     model = genai.GenerativeModel("models/gemini-1.5-pro-latest")
 
     prompt = f"""
+    
     You are an AI grading assistant. Compare the student's answer with the teacher's sample answer.
     - Assign a grade between **0 to 100** based on correctness, completeness, and relevance.
     - Only return a number. No extra text.

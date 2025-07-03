@@ -21,7 +21,7 @@ from services.dashboard import get_student_progress, get_student_assignments,fil
 from services.dashboard import get_teacher_assignments, get_exam_marks_teacher, get_student_progress_teacher, get_weekly_attendance,get_all_Classes
 from services.dashboard import get_exam_marks_admin,  get_student_progress_admin, get_weekly_attendance_admin, get_stats, get_all_users
 
-from services.usermanagement import login_user, add_admin, add_student, add_teacher, delete_user,edit_profile, update_password, get_profile, serialize_dates
+from services.usermanagement import login_user, add_admin, add_student, add_teacher, delete_user,edit_profile, update_password, get_profile, serialize_dates,logout_user
 
 from schemas.usermanagement import LoginRequest, AdminCreate,StudentRegistration,TeacherCreate, UserProfileUpdate, UpdatePasswordRequest
 
@@ -41,21 +41,37 @@ app = FastAPI(title="Microservices API Gateway")
 
 
 
+# app.add_middleware(
+#     CORSMiddleware,
+#     # allow_origins=["*"],  # Frontend URL
+#     allow_origins=["http://localhost:5173"],  # Frontend URL
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Frontend URL
-    # allow_origins=["http://localhost:5173"],  # Frontend URL
+    allow_origins=["http://localhost:5173"],  # Frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 # User-management
 @app.post("/api/user-management/login/")
 async def api_login(username: str = Form(...), password: str = Form(...)):
     credentials = {"username": username, "password": password}
     return await login_user(credentials)
+
+@app.post("/api/user-management/logout")
+async def api_logout(
+    user_id: str = Form(...),
+    role: str = Form(...),
+    token: str = Depends(oauth2_scheme)
+):
+    authorization = f"Bearer {token}"
+    return await logout_user(user_id, role, authorization)
 
 
 @app.post("/api/user-management/add-student")

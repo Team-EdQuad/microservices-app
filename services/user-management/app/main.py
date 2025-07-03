@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, Request
-from app.routers import login, add_admin, add_student, add_teacher, delete_user, edit_profile, update_password, admin_user_management
+from app.routers import login, add_admin, add_student, add_teacher, delete_user, edit_profile, update_password, admin_user_management,logout
 from app.services.auth_service import get_current_user
 from app.models.admin_model import AdminModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -145,6 +145,7 @@ async def options_handler(request: Request, full_path: str):
 
 # Include routers for each functionality
 app.include_router(login.router)
+app.include_router(logout.router)  
 app.include_router(add_admin.router)
 app.include_router(add_student.router)
 app.include_router(add_teacher.router)

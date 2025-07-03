@@ -3,14 +3,19 @@ from fastapi import APIRouter, HTTPException
 from .database import student_table, subject_table, content_table, student_content_table
 from .database import assignment_table, submission_table, academic_attendance_table
 from .database import exam_table, behavioural_table
-# from .ml_model_loader import model
+from .ml_model_loader import model
 
 from datetime import datetime, timedelta
 from collections import defaultdict
-# import pandas as pd
-# import pytz
+import pandas as pd
+import pytz
 
 model_features_router = APIRouter()
+
+def predict_performance(features_dict: dict) -> float:
+    df = pd.DataFrame([features_dict])
+    prediction = model.predict(df)[0]
+    return round(float(prediction), 2)
 
 @model_features_router.get("/{student_id}/{class_id}/model-features")
 async def get_model_features(student_id: str, class_id: str):
@@ -25,7 +30,7 @@ async def get_model_features(student_id: str, class_id: str):
 
         ### ---- LMS Completion ----
         lms_completion = {}
-        for i, subject_id in enumerate(subject_ids[:3]):
+        for i, subject_id in enumerate(subject_ids[:6]):
             total_contents = content_table.count_documents({"subject_id": subject_id, "class_id": class_id})
             completed_contents = student_content_table.count_documents({
                 "subject_id": subject_id, "class_id": class_id,
@@ -137,7 +142,7 @@ async def get_model_features(student_id: str, class_id: str):
             **exam_averages,
             **assi_marks,
             "assi_late": assi_late_pct,
-            "non_academic_attendance": non_academic_attendance_rate,
+            "non-academic_attendance": non_academic_attendance_rate,
             "academic_attendance": academic_attendance_rate,
             "lms_login_freq_per_day": lms_login_freq,
             "lms_active_avg_hrs": avg_duration_hrs,

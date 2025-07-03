@@ -26,13 +26,14 @@ async def register_student(student: StudentRegistration):
             raise HTTPException(status_code=400, detail="Student ID already exists.")
         if await collection.find_one({"email": student.email}):
             raise HTTPException(status_code=400, detail="Email already exists.")
-        if await collection.find_one({"phone": student.phone}):
+        if await collection.find_one({"phone_no": student.phone}):
             raise HTTPException(status_code=400, detail="Phone number already exists.")
 
     # Hash password (using bcrypt)
-    hashed_password = bcrypt.hashpw(student.password.encode('utf-8'), bcrypt.gensalt())  # Hash the password
+    # hashed_password = bcrypt.hashpw(student.password.encode('utf-8'), bcrypt.gensalt())  # Hash the password
     student_data = student.dict()
-    student_data["password"] = hashed_password.decode('utf-8')  # Store the hashed password
+    # student_data["password"] = hashed_password.decode('utf-8')  # Store the hashed password
+    student_data["password"] = student.password  # Store the plain password (not recommended for production)
     student_data["full_name"] = f"{student.first_name} {student.last_name}"
     student_data["join_date"] = datetime.utcnow().date().isoformat()
     student_data["last_edit_date"] = datetime.utcnow().date().isoformat()

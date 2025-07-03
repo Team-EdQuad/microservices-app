@@ -34,19 +34,28 @@ def grade_answer(teacher_answer: str, student_answer: str) -> int:
     model = genai.GenerativeModel("models/gemini-2.0-flash-exp")
 
     prompt = f"""
-    You are an AI grading assistant. Compare the student's answer with the teacher's sample answer.
-    - Assign a grade between **0 to 100** based on correctness, completeness, and relevance.
-    - Only return a number. No extra text.
+    You are a fair and intelligent grading assistant. Your task is to grade a student's answer using the teacher's sample answer as a **reference**, not as the only correct version.
 
-    **Teacher's Sample Answer:**  
+    Use the following criteria:
+    1. **Correctness (40%)** – Is the student's answer factually correct, even if phrased differently?
+    2. **Completeness (30%)** – Does the student cover the important points addressed in the teacher's sample or that are clearly relevant to the question?
+    3. **Relevance (20%)** – Does the student stay on-topic and address the actual question?
+    4. **Clarity (10%)** – Is the answer well-structured and understandable?
+
+    Guidelines:
+    - Use the teacher's answer as guidance, but be open to alternative valid responses.
+    - Be unbiased. Don't penalize for different wording or extra correct points.
+    - Only return a final **numeric score between 0 and 100**. Do not explain or write any text.
+
+    Teacher's Sample Answer:
     {teacher_answer}
 
-    **Student's Answer:**  
+    Student's Answer:
     {student_answer}
 
-    **Output Format:**  
-    - (score between 0-100)
-    """
+    Final Score:
+    """   
+
 
     try:
         response = model.generate_content(prompt)

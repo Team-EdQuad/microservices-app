@@ -65,6 +65,7 @@ class PredictionOutput(BaseModel):
 
 @router.post("/predict_active_time", response_model=PredictionOutput)
 async def predict_active_time(input_data: PredictionInput):
+
     if model is None:
         raise HTTPException(status_code=500, detail="Model is not initialized. Ensure dataset is available.")
     
@@ -89,3 +90,10 @@ async def predict_active_time(input_data: PredictionInput):
     except Exception as e:
         logger.error(f"Prediction error: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Prediction failed: {str(e)}")
+    
+
+
+
+
+
+    

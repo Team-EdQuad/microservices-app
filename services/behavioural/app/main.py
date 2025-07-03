@@ -1,14 +1,19 @@
-from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi import FastAPI, APIRouter, HTTPException, logger
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import status
 from datetime import datetime, timedelta, timezone
+from pydantic import BaseModel
 import pytz  
 from pymongo.collection import Collection
 from typing import Dict
-from bson.son import SON
 from .services.database import db  
 from .services.predict_active_time import router as predict_router
 import traceback
+import logging
 
+
+
+logger = logging.getLogger(__name__)
 SRI_LANKA_TZ = pytz.timezone('Asia/Colombo')
 app = FastAPI(title="Behavioral Analysis API")
 
@@ -398,6 +403,132 @@ async def close_content_access(request_data: Dict):
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+
+class UpdateResponse(BaseModel):
+    success: bool
+    message: str
+    subject_id: str
+    class_id: str
+    updated_week: int
+    calculated_data: dict
+
+
+
+
+@router.post(
+    "/update_weekly_data/{subject_id}/{class_id}",
+    response_model=UpdateResponse,
+    summary="Calculate and insert the current week's real data for active time prediction."
+)
+async def update_weekly_data(subject_id: str, class_id: str):
+    try:
+        # --- Collections ---
+        prediction_collection: Collection = db["active_time_prediction"]
+        behavioral_collection: Collection = db["behavioral_analysis"]
+        assignment_collection: Collection = db["assignment"]
+        content_collection: Collection = db["content"]
+
+        # --- Get the week range ---
+        week_start, week_end = get_current_week_range()
+
+        # --- Get the last Weeknumber and increment it ---
+        last_entry = prediction_collection.find_one(
+            {"subject_id": subject_id, "class_id": class_id},
+            sort=[("Weeknumber", -1)]
+        )
+        last_week = last_entry.get("Weeknumber", 0) if last_entry else 0
+        current_week_number = last_week + 1
+
+        # --- Debug print ---
+        logger.info(f"Generating data for Weeknumber {current_week_number} ({week_start} to {week_end})")
+
+        # --- Behavioral data aggregation ---
+        b_pipeline = [
+            {"$match": {
+                "subject_id": subject_id,
+                "class_id": class_id,
+                "accessBeginTime": {"$exists": True, "$type": "string"},
+                "durationMinutes": {"$exists": True, "$type": "number"}
+            }},
+            {"$addFields": {
+                "parsedAccessTime": {"$dateFromString": {"dateString": "$accessBeginTime"}}
+            }},
+            {"$match": {
+                "parsedAccessTime": {"$gte": week_start, "$lt": week_end}
+            }},
+            {"$group": {
+                "_id": None,
+                "total": {"$sum": "$durationMinutes"}
+            }}
+        ]
+        b_res = list(behavioral_collection.aggregate(b_pipeline))
+        total_active_time = round(b_res[0]["total"], 2) if b_res else 0.0
+
+        # --- Assignments check ---
+        assignment_count = assignment_collection.count_documents({
+            "subject_id": subject_id,
+            "class_id": class_id,
+            "created_at": {"$gte": week_start, "$lt": week_end}
+        })
+        special_event_flag = 1 if assignment_count > 0 else 0
+
+        # --- Content count ---
+        c_pipeline = [
+            {"$match": {
+                "subject_id": subject_id,
+                "class_id": class_id,
+                "upload_date": {"$exists": True, "$type": "string"}
+            }},
+            {"$addFields": {
+                "upload_dt": {"$dateFromString": {"dateString": "$upload_date"}}
+            }},
+            {"$match": {
+                "upload_dt": {"$gte": week_start, "$lt": week_end}
+            }},
+            {"$count": "cnt"}
+        ]
+        c_res = list(content_collection.aggregate(c_pipeline))
+        resources_uploaded = c_res[0]["cnt"] if c_res else 0
+
+        # --- Final document to insert ---
+        doc = {
+            "Weeknumber": current_week_number,
+            "TotalActiveTime": total_active_time,
+            "subject_id": subject_id,
+            "class_id": class_id,
+            "SpecialEventThisWeek": special_event_flag,
+            "ResourcesUploadedThisWeek": resources_uploaded,
+            "WeekStartDate": week_start,
+            "WeekEndDate": week_end,
+            "data": "1"  # This marks it as real data
+        }
+
+        # --- Insert new document (never update old weeks) ---
+        prediction_collection.insert_one(doc)
+        
+
+        doc.pop("_id", None)
+        return UpdateResponse(
+            success=True,
+            message="Real weekly data inserted successfully (Weeknumber incremented).",
+            subject_id=subject_id,
+            class_id=class_id,
+            updated_week=current_week_number,
+            calculated_data=doc
+        )
+
+    except Exception as e:
+        logger.exception(f"Failed to insert real data for {subject_id}/{class_id}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+
+
+
 
 app.include_router(router)
 app.include_router(predict_router, tags=["Endpoints prediction "])

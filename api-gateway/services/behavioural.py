@@ -2,9 +2,14 @@ import httpx
 from fastapi import HTTPException
 import logging
 
+from pydantic import BaseModel
+
 BEHAVIOURAL_SERVICE_URL = "http://127.0.0.1:8005"
 
 
+class PredictionInput(BaseModel):
+    SpecialEventThisWeek: int
+    ResourcesUploadedThisWeek: int
 
 async def time_spent_on_resources(subject_id, class_id):
     try:
@@ -98,23 +103,60 @@ async def Visualize_data_list(subject_id: str, class_id: str):
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(exc)}")
 
 
-async def active_time_prediction(input_data: dict):
+
+
+async def call_prediction_service(
+    subject_id: str,
+    class_id: str,
+    input_data: PredictionInput
+):
+    """
+    Calls the downstream ML prediction service.
+    """
+    # The URL for the ML service's specific prediction endpoint
+    service_url = f"{BEHAVIOURAL_SERVICE_URL}/predict_active_time/{subject_id}/{class_id}"
+
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.post(f"{BEHAVIOURAL_SERVICE_URL}/predict_active_time", json=input_data)
+            # Send the request with the input data as a JSON body
+            response = await client.post(service_url, json=input_data.dict())
+            
+            # Raise an exception for bad status codes (4xx or 5xx)
             response.raise_for_status()
+            
+            # Return the JSON response from the ML service
             return response.json()
+            
     except httpx.HTTPStatusError as exc:
-        raise HTTPException(status_code=exc.response.status_code, detail=str(exc))
+        # Forward the error from the downstream service to the client
+        raise HTTPException(
+            status_code=exc.response.status_code, 
+            detail=f"Error from prediction service: {exc.response.text}"
+        )
+    except httpx.RequestError as exc:
+        # Handle network errors (e.g., the service is down)
+        raise HTTPException(
+            status_code=503, # Service Unavailable
+            detail=f"Could not connect to the prediction service: {exc}"
+        )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Prediction error: {str(exc)}")
+        # Handle other unexpected errors
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(exc)}")
 
 
 
-async def model_train():
+
+
+
+
+
+
+
+
+async def model_train(subject_id, class_id):
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.post(f"{BEHAVIOURAL_SERVICE_URL}/train")
+            response = await client.post(f"{BEHAVIOURAL_SERVICE_URL}/train/{subject_id}/{class_id}")
             response.raise_for_status()
             return response.json()
     except httpx.HTTPStatusError as exc:
@@ -123,28 +165,28 @@ async def model_train():
         raise HTTPException(status_code=500, detail=f"Training error: {str(exc)}")
 
 
-async def load_model():
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(f"{BEHAVIOURAL_SERVICE_URL}/load_model")
-            response.raise_for_status()
-            return response.json()
-    except httpx.HTTPStatusError as exc:
-        raise HTTPException(status_code=exc.response.status_code, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Load model error: {str(exc)}")
+# async def load_model():
+#     try:
+#         async with httpx.AsyncClient() as client:
+#             response = await client.post(f"{BEHAVIOURAL_SERVICE_URL}/load_model")
+#             response.raise_for_status()
+#             return response.json()
+#     except httpx.HTTPStatusError as exc:
+#         raise HTTPException(status_code=exc.response.status_code, detail=str(exc))
+#     except Exception as exc:
+#         raise HTTPException(status_code=500, detail=f"Load model error: {str(exc)}")
 
 
-async def get_model_status():
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"{BEHAVIOURAL_SERVICE_URL}/model_status")
-            response.raise_for_status()
-            return response.json()
-    except httpx.HTTPStatusError as exc:
-        raise HTTPException(status_code=exc.response.status_code, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Model status fetch error: {str(exc)}")
+# async def get_model_status():
+#     try:
+#         async with httpx.AsyncClient() as client:
+#             response = await client.get(f"{BEHAVIOURAL_SERVICE_URL}/model_status")
+#             response.raise_for_status()
+#             return response.json()
+#     except httpx.HTTPStatusError as exc:
+#         raise HTTPException(status_code=exc.response.status_code, detail=str(exc))
+#     except Exception as exc:
+#         raise HTTPException(status_code=500, detail=f"Model status fetch error: {str(exc)}")
 
 
 

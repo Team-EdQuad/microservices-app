@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
@@ -200,9 +199,6 @@ async def predict_active_time(subject_id: str, class_id: str, input_data: Predic
     except Exception as e:
         logger.error(f"Prediction error for {subject_id}/{class_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
-
-
-
 
 @router.get("/model_status/{subject_id}/{class_id}", response_model=ModelStatus)
 async def get_model_status(subject_id: str, class_id: str):

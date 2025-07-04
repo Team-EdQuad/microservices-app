@@ -101,27 +101,45 @@ async def get_avg_time_spent(subject_id: str, class_id: str):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
+
+
+
 @router.get("/SiteAverageActiveTime/{class_id}")
 async def get_site_average_active_time(class_id: str):
     try:
-        # Get registered students count
+        # Get registered students count in the class
         registered_students = list(db["student"].find({"class_id": class_id}))
         total_registered = len(registered_students)
-        
+
         # Get current week range
         start_date, end_date = get_current_week_range()
         start_date_str = start_date.isoformat().replace('+00:00', 'Z')
         end_date_str = end_date.isoformat().replace('+00:00', 'Z')
-        
+
         print(f"Query range: {start_date_str} to {end_date_str}")
-        
-        # Find all activity for this class (regardless of student registration)
+
+        # Aggregation with lookup to match students in the given class
         pipeline = [
             {
                 "$match": {
-                    "class_id": class_id,
                     "loginTime": {"$gte": start_date_str, "$lt": end_date_str},
                     "logoutTime": {"$exists": True, "$ne": None}
+                }
+            },
+            {
+                "$lookup": {
+                    "from": "student",
+                    "localField": "student_id",
+                    "foreignField": "student_id",
+                    "as": "student_info"
+                }
+            },
+            {
+                "$unwind": "$student_info"
+            },
+            {
+                "$match": {
+                    "student_info.class_id": class_id
                 }
             },
             {
@@ -143,34 +161,38 @@ async def get_site_average_active_time(class_id: str):
                 }
             }
         ]
-        
-        result = list(db["site_activity_logs"].aggregate(pipeline))
+
+        result = list(db["student_login_details"].aggregate(pipeline))
         print(f"Aggregation result: {result}")
-        
+
         if not result:
             return {
                 "siteAverageActiveTimePerStudent": 0,
                 "totalStudents": total_registered,
                 "activeStudents": 0
             }
-        
-        # Calculate average from active students
+
+        # Calculate average time (in minutes)
         total_minutes = sum(doc["totalMillis"] / (1000 * 60) for doc in result)
         active_student_count = len(result)
-        
-        # Use registered students count or active students count
+
+        # Average per registered student
         divisor = max(total_registered, active_student_count)
         average = round(total_minutes / divisor, 2) if divisor > 0 else 0
-        
+
         return {
             "siteAverageActiveTimePerStudent": average,
             "totalStudents": total_registered,
             "activeStudents": active_student_count
         }
-        
+
     except Exception as e:
+        import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+
 
 @router.get("/ResourceAccessFrequency/{subject_id}/{class_id}")
 async def get_resource_access_frequency(subject_id: str, class_id: str):

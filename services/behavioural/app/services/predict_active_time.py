@@ -68,8 +68,6 @@ def load_model(subject_id: str, class_id: str):
     return None, None
 
 
-
-
 def train_model_from_db(subject_id: str, class_id: str):
     """Train a model by fetching filtered data from MongoDB."""
     try:
@@ -202,10 +200,6 @@ def train_model_from_db(subject_id: str, class_id: str):
     except Exception as e:
         logger.error(f"Error during model training for {subject_id}/{class_id}: {e}")
         return None, str(e)
-
-
-
-
 
 # --- API Endpoints ---
 @router.post("/train/{subject_id}/{class_id}", response_model=TrainingResponse)

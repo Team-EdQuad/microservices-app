@@ -67,6 +67,9 @@ def load_model(subject_id: str, class_id: str):
         logger.error(f"Error loading model for {subject_id}/{class_id}: {e}")
     return None, None
 
+
+
+
 def train_model_from_db(subject_id: str, class_id: str):
     """Train a model by fetching filtered data from MongoDB."""
     try:
@@ -79,25 +82,116 @@ def train_model_from_db(subject_id: str, class_id: str):
         cursor = collection.find(query).sort("Weeknumber", 1)
         
         data_list = list(cursor)
-        if len(data_list) < 10: # Need enough data for training and feature engineering
-            raise ValueError(f"Insufficient data for training. Found {len(data_list)} records, require at least 10.")
+        logger.info(f"Raw data fetched: {len(data_list)} records")
+        
+        if len(data_list) < 6:
+            raise ValueError(f"Insufficient data for training. Found {len(data_list)} records, require at least 6.")
             
         data = pd.DataFrame(data_list)
-        logger.info(f"Fetched {len(data)} rows from DB for subject '{subject_id}', class '{class_id}'")
-
-        # 2. Perform Feature Engineering
-        data['PrevWeekActiveTime'] = data['TotalActiveTime'].shift(1)
-        data['Prev2WeekActiveTime'] = data['TotalActiveTime'].shift(2)
-        data['RollingMean5'] = data['TotalActiveTime'].shift(1).rolling(window=5).mean()
-        data['InteractionTerm'] = data['SpecialEventThisWeek'] * data['ResourcesUploadedThisWeek']
-        data = data.dropna().reset_index(drop=True)
-
-        X = data[FEATURES]
-        y = data["TotalActiveTime"]
-
-        X_train, _, y_train, _ = train_test_split(X, y, test_size=0.2, random_state=42)
+        logger.info(f"DataFrame created with {len(data)} rows")
         
-        # 3. Train the Model
+        # 2. Data Cleaning and Type Conversion
+        essential_cols = ['TotalActiveTime', 'SpecialEventThisWeek', 'ResourcesUploadedThisWeek', 'Weeknumber']
+        
+        # Check original data types and missing values
+        logger.info("Original data info:")
+        for col in essential_cols:
+            if col in data.columns:
+                logger.info(f"{col}: dtype={data[col].dtype}, null_count={data[col].isnull().sum()}, sample_values={data[col].head(3).tolist()}")
+            else:
+                logger.error(f"Missing column: {col}")
+                raise ValueError(f"Required column '{col}' not found in data")
+        
+        # Clean and convert data types
+        for col in essential_cols:
+            if col in data.columns:
+                # Convert to numeric, forcing errors to NaN
+                data[col] = pd.to_numeric(data[col], errors='coerce')
+                
+        logger.info("After type conversion:")
+        for col in essential_cols:
+            logger.info(f"{col}: null_count={data[col].isnull().sum()}")
+        
+        # Remove rows with missing essential data
+        data_clean = data.dropna(subset=essential_cols).copy()
+        logger.info(f"After removing rows with missing essential data: {len(data_clean)} rows")
+        
+        if len(data_clean) < 6:
+            raise ValueError(f"Insufficient clean data. Found {len(data_clean)} valid records after cleaning, require at least 6.")
+        
+        # Sort by Weeknumber again to ensure proper order
+        data_clean = data_clean.sort_values('Weeknumber').reset_index(drop=True)
+        
+        # 3. Feature Engineering with better handling
+        data_clean['PrevWeekActiveTime'] = data_clean['TotalActiveTime'].shift(1)
+        data_clean['Prev2WeekActiveTime'] = data_clean['TotalActiveTime'].shift(2)
+        
+        # Use a smaller rolling window if we don't have enough data
+        rolling_window = min(3, len(data_clean) - 2)  # Ensure we have at least some data left
+        data_clean['RollingMean5'] = data_clean['TotalActiveTime'].shift(1).rolling(window=rolling_window, min_periods=1).mean()
+        
+        data_clean['InteractionTerm'] = data_clean['SpecialEventThisWeek'] * data_clean['ResourcesUploadedThisWeek']
+        
+        logger.info(f"After feature engineering, before final dropna: {len(data_clean)} rows")
+        
+        # Check for NaN values in features
+        features_to_check = ['PrevWeekActiveTime', 'Prev2WeekActiveTime', 'RollingMean5', 'InteractionTerm', 'SpecialEventThisWeek', 'ResourcesUploadedThisWeek']
+        for feature in features_to_check:
+            nan_count = data_clean[feature].isnull().sum()
+            logger.info(f"{feature}: {nan_count} NaN values")
+        
+        # Instead of dropping all NaN, fill them strategically
+        # For lag features, we can only start from the appropriate row
+        # Remove only the first 2 rows (due to Prev2WeekActiveTime)
+        data_final = data_clean.iloc[2:].copy()
+        
+        # Fill any remaining NaN values in RollingMean5 with the previous week's value
+        data_final['RollingMean5'] = data_final['RollingMean5'].fillna(data_final['PrevWeekActiveTime'])
+        
+        logger.info(f"Final data shape: {len(data_final)} rows")
+        
+        if len(data_final) < 3:
+            raise ValueError(f"Insufficient data after feature engineering. Found {len(data_final)} valid records, require at least 3.")
+        
+        # Verify all required features are present
+        missing_features = [f for f in FEATURES if f not in data_final.columns]
+        if missing_features:
+            raise ValueError(f"Missing required features: {missing_features}")
+        
+        X = data_final[FEATURES]
+        y = data_final["TotalActiveTime"]
+        
+        # Final check for any remaining NaN values
+        nan_in_features = X.isnull().sum().sum()
+        nan_in_target = y.isnull().sum()
+        
+        if nan_in_features > 0 or nan_in_target > 0:
+            logger.warning(f"Found {nan_in_features} NaN in features, {nan_in_target} NaN in target. Dropping these rows.")
+            # Create a mask for rows without NaN
+            mask = ~(X.isnull().any(axis=1) | y.isnull())
+            X = X[mask]
+            y = y[mask]
+        
+        logger.info(f"Final feature matrix shape: {X.shape}")
+        logger.info(f"Final target vector shape: {y.shape}")
+        
+        if len(X) < 3:
+            raise ValueError(f"Insufficient data after final cleaning. Found {len(X)} valid records, require at least 3.")
+        
+        # 4. Train the Model
+        # Use train-test split only if we have enough data
+        if len(X) < 5:
+            X_train, y_train = X, y
+            logger.warning(f"Small dataset ({len(X)} records). Using all data for training without test split.")
+        else:
+            # Ensure we have at least 1 sample for test
+            test_size = max(1, int(len(X) * 0.2))
+            test_size = min(test_size, len(X) - 1)  # Ensure at least 1 for training
+            train_size = len(X) - test_size
+            
+            X_train, _, y_train, _ = train_test_split(X, y, train_size=train_size, random_state=42)
+            logger.info(f"Using train-test split: {len(X_train)} train, {test_size} test")
+        
         model = LinearRegression()
         model.fit(X_train, y_train)
         train_score = model.score(X_train, y_train)
@@ -108,6 +202,9 @@ def train_model_from_db(subject_id: str, class_id: str):
     except Exception as e:
         logger.error(f"Error during model training for {subject_id}/{class_id}: {e}")
         return None, str(e)
+
+
+
 
 
 # --- API Endpoints ---
@@ -248,7 +345,6 @@ async def visualize_data(subject_id: str, class_id: str):
     except Exception as e:
         logger.error(f"Visualization endpoint error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 
 

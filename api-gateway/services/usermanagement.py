@@ -1,30 +1,20 @@
 import httpx
-from fastapi import HTTPException, Request, APIRouter, Depends
-from typing import Optional
+from fastapi import HTTPException, Request, APIRouter, Depends, UploadFile
+from typing import Optional,Dict, Any
+from pathlib import Path 
 import json
 from datetime import date
+import shutil
 # from app.services.auth_service import get_current_user
 # from app.models.admin_model import AdminModel
 
 USER_MANAGEMENT_SERVICE_URL = "http://127.0.0.1:8001"
 
+
 router = APIRouter()
 
+
 # --- Login ---
-# async def login_user(credentials: dict):
-#     try:
-#         async with httpx.AsyncClient() as client:
-#             response = await client.post(
-#                 f"{USER_MANAGEMENT_SERVICE_URL}/login",
-#                 json=credentials
-#             )
-#             response.raise_for_status()
-#             return response.json()
-#     except httpx.HTTPStatusError as exc:
-#         raise HTTPException(status_code=exc.response.status_code, detail="Login failed")
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
-#     raise HTTPException(status_code=500, detail=str(e))
 async def login_user(credentials: dict):
     try:
         async with httpx.AsyncClient() as client:
@@ -42,6 +32,28 @@ async def login_user(credentials: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# --- Logout ---
+async def logout_user(user_id: str, role: str, authorization: str = None):
+    headers = {}
+    if authorization:
+        headers["Authorization"] = authorization
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{USER_MANAGEMENT_SERVICE_URL}/logout",
+                data={"user_id": user_id, "role": role},
+                headers=headers
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        detail = exc.response.json().get("detail", "User service error")
+        raise HTTPException(status_code=exc.response.status_code, detail=detail)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
 # --- Add Admin ---
 async def add_admin(admin_data: dict, authorization: str = None):
     headers = {}
@@ -201,6 +213,8 @@ async def update_password(password_data: dict, authorization: str = None):
 #         raise HTTPException(status_code=500, detail=str(e))
 
 # --- Get Profile ---
+
+# ... (other existing functions in usermanagement.py) ...    
 async def get_profile(authorization: Optional[str] = None):
     headers = {}
     if authorization:
@@ -233,3 +247,4 @@ def serialize_dates(data: dict):
         elif isinstance(value, list):
             data[key] = [v.isoformat() if isinstance(v, date) else v for v in value]
     return data
+

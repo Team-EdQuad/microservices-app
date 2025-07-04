@@ -3,11 +3,17 @@ import os
 from datetime import datetime, timedelta
 import httpx 
 from fastapi.responses import JSONResponse
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from fastapi import Depends,Request,Body,Form
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles 
+from fastapi import Query
+from datetime import date
+
+
 
 import json
 # from services.attendance.app.utils import schemas as attModSchemas
@@ -21,9 +27,10 @@ from services.dashboard import get_student_progress, get_student_assignments,fil
 from services.dashboard import get_teacher_assignments, get_exam_marks_teacher, get_student_progress_teacher, get_weekly_attendance,get_all_Classes
 from services.dashboard import get_exam_marks_admin,  get_student_progress_admin, get_weekly_attendance_admin, get_stats, get_all_users
 
-from services.usermanagement import login_user, add_admin, add_student, add_teacher, delete_user,edit_profile, update_password, get_profile, serialize_dates
+from services.usermanagement import login_user, add_admin, add_student, add_teacher, delete_user,edit_profile, update_password, get_profile, serialize_dates,logout_user
 
 from schemas.usermanagement import LoginRequest, AdminCreate,StudentRegistration,TeacherCreate, UserProfileUpdate, UpdatePasswordRequest
+from services.calendar import get_assignment_deadlines
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/user-management/login")
@@ -34,9 +41,14 @@ from services.behavioural import get_model_status,load_model,model_train,active_
 
 from services.attendance import attendanceRouter
 
+
 app = FastAPI(title="Microservices API Gateway") 
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 # app.include_router(attendanceRouter)
+
+
 
 
 # app.add_middleware(
@@ -61,6 +73,15 @@ app.add_middleware(
 async def api_login(username: str = Form(...), password: str = Form(...)):
     credentials = {"username": username, "password": password}
     return await login_user(credentials)
+
+@app.post("/api/user-management/logout")
+async def api_logout(
+    user_id: str = Form(...),
+    role: str = Form(...),
+    token: str = Depends(oauth2_scheme)
+):
+    authorization = f"Bearer {token}"
+    return await logout_user(user_id, role, authorization)
 
 
 @app.post("/api/user-management/add-student")
@@ -117,6 +138,29 @@ async def profile(token: str = Depends(oauth2_scheme)):
     profile_data = await get_profile(authorization=auth_header)
     print(f"Profile data response: {profile_data}")
     return profile_data
+
+# NEW CALENDAR ENDPOINT
+@app.get("/api/calendar/assignments/deadlines", response_model=List[Dict[str, Any]])
+async def api_get_assignment_deadlines(
+    student_id: Optional[str] = Query(None),
+    class_id: Optional[str] = Query(None),
+    subject_id: Optional[str] = Query(None),
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    token: str = Depends(oauth2_scheme) # Assuming authentication is required
+) -> List[Dict[str, Any]]:
+    """
+    API Gateway endpoint to fetch assignment deadlines from the Calendar microservice.
+    """
+    authorization = f"Bearer {token}"
+    return await get_assignment_deadlines(
+        student_id=student_id,
+        class_id=class_id,
+        subject_id=subject_id,
+        start_date=start_date,
+        end_date=end_date,
+        authorization=authorization
+    )
 
 
 #non-academic
@@ -180,8 +224,6 @@ async def fetch_assignment_marks(student_id: str):
 async def fetch_exam_marks(student_id: str):
     return await get_exam_marks(student_id)
     
-
-
 @app.post("/api/submission/{student_id}/{assignment_id}")
 async def submit_assignment_file(
     student_id: str,

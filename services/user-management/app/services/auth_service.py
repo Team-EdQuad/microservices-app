@@ -12,9 +12,6 @@ from app.models.student_model import StudentRegistration
 from app.models.teacher_model import TeacherModel
 from typing import Optional,Union
 
-# Set up the password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 # Secret key for encoding JWT
 SECRET_KEY = "mysecretkey"  # Use a secure secret key for production
 ALGORITHM = "HS256"
@@ -34,11 +31,14 @@ def parse_date(value: Optional[Union[str, datetime, date]]) -> Optional[datetime
     
 # Function to hash passwords
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    # return pwd_context.hash(password)
+    return password
 
 # Function to verify password
+# def verify_password(plain_password: str, hashed_password: str) -> bool:
+#     return pwd_context.verify(plain_password, hashed_password)
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    return plain_password == hashed_password 
 
 # Function to create JWT tokens
 def create_access_token(data: dict, expires_delta: timedelta = timedelta(hours=1)) -> str:
@@ -48,114 +48,13 @@ def create_access_token(data: dict, expires_delta: timedelta = timedelta(hours=1
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-# Function to retrieve current user from token
-# async def get_current_user(token: str) -> Optional[dict]:
-#     try:
-#         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-#         user = await db["users"].find_one({"_id": payload["sub"]})
-#         if not user:
-#             raise HTTPException(status_code=401, detail="Invalid token or user does not exist")
-#         return user
-#     except jwt.PyJWTError:
-#         raise HTTPException(status_code=401, detail="Invalid token")
-
-# async def get_current_user(token: str = Depends(oauth2_scheme)) -> AdminModel:
-#     try:
-#         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-#         user_id = payload.get("sub")
-#         role = payload.get("role")
-#         if user_id is None or role is None:
-#             raise HTTPException(status_code=401, detail="Invalid token payload")
-
-#         # Fetch user from the correct collection depending on role
-#         if role == "admin":
-#             user = await db["admins"].find_one({"_id": user_id})
-#         elif role == "student":
-#             user = await db["students"].find_one({"_id": user_id})
-#         elif role == "teacher":
-#             user = await db["teachers"].find_one({"_id": user_id})
-#         else:
-#             raise HTTPException(status_code=403, detail="Invalid user role")
-
-#         if not user:
-#             raise HTTPException(status_code=401, detail="User not found")
-
-#         # Convert to your Pydantic model for typing
-#         if role == "admin":
-#             return AdminModel(**user)
-#         # Similarly, return student or teacher models if you want here
-#         return user
-
-#     except jwt.PyJWTError:
-#         raise HTTPException(status_code=401, detail="Invalid token")
-
-
-# async def get_current_user(token: str = Depends(oauth2_scheme)):
-#     try:
-#         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-#         user_id = payload.get("sub")
-#         print("Extracted user_id from token:", user_id)
-#         role = payload.get("role")
-#         print("Extracted role from token:", role)
-
-#         if user_id is None or role is None:
-#             raise HTTPException(status_code=401, detail="Invalid token payload")
-
-#         # try:
-#         #     user_object_id = ObjectId(user_id)
-#         # except:
-#         #     raise HTTPException(status_code=400, detail="Invalid user ID format")
-#         role = role.lower()
-#         if role == "admin":
-#             try:
-#                 user_object_id = ObjectId(user_id)
-#             except Exception:
-#                 raise HTTPException(status_code=400, detail="Invalid user ID format for admin")
-
-#             user = await db["admin"].find_one({"_id": user_object_id})
-#             if not user:
-#                 raise HTTPException(status_code=403, detail="Admin privileges required")
-            
-#             user["admin_id"] = str(user["_id"])
-#             del user["_id"]
-
-#             user["role"] = "admin"  # <-- Add this line!
-
-#             return AdminModel(**user)
-
-#         elif role == "student":
-#             student_doc = await db["student"].find_one({"student_id": user_id})
-#             if not student_doc:
-#                 raise HTTPException(status_code=401, detail="User not found")
-
-#             student_data = transform_student_doc_to_model(student_doc)
-#             return StudentRegistration(**student_data)
-
-#         elif role == "teacher":
-#             try:
-#                 user_object_id = ObjectId(user_id)
-#             except Exception:
-#                 raise HTTPException(status_code=400, detail="Invalid user ID format for admin")
-
-#             user = await db["teacher"].find_one({"_id": user_object_id})
-#             if not user:
-#                 raise HTTPException(status_code=401, detail="User not found")
-
-#             user["teacher_id"] = str(user["_id"])
-#             del user["_id"]
-#             user["role"] = "teacher"
-#             return TeacherModel(**user)
-
-#         else:
-#             raise HTTPException(status_code=403, detail="Invalid user role")
-
-#     except jwt.PyJWTError:
-#         raise HTTPException(status_code=401, detail="Invalid token")
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("sub")
         role = payload.get("role")
+
+        print(f"DEBUG: token payload - user_id: {user_id}, role: {role}")
 
         if user_id is None or role is None:
             raise HTTPException(status_code=401, detail="Invalid token payload")
@@ -180,6 +79,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 
         # Query by custom ID field as string, no ObjectId conversion
         user_doc = await db[collection_name].find_one({id_field: user_id})
+        print(f"DEBUG: user_doc fetched from DB: {user_doc}")
         if not user_doc:
             raise HTTPException(status_code=404, detail=f"{role.capitalize()} not found")
 
@@ -219,30 +119,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
             }
             return TeacherModel(**teacher_data)
 
-    except jwt.PyJWTError:
+    except jwt.JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
-
-
-# def transform_student_doc_to_model(doc: dict) -> dict:
-#     return {
-#         "student_id": doc.get("student_id", ""),
-#         "first_name": doc.get("full_name", "").split()[0] if doc.get("full_name") else "",
-#         "last_name": " ".join(doc.get("full_name", "").split()[1:]) if doc.get("full_name") else "",
-#         "full_name": doc.get("full_name", ""),
-#         "email": doc.get("email", ""),
-#         "password": doc.get("password", ""),
-#         "gender": doc.get("gender", "").lower(),  # make it lowercase for validation
-#         # "class_name": doc.get("class_id", "")[-1:] if doc.get("class_id") else "",  # extract class name from class_id like "CLS001"
-#         # "grade": int(doc.get("class_id", "")[-3:-1]) if doc.get("class_id") else 0,  # or other logic for grade
-#         "class_id": doc.get("class_id", ""),
-#         "phone": str(doc.get("phone_no", "")),
-#         "subject": doc.get("subject_id", []),
-#         "club_id": doc.get("club_id", []),
-#         "sport_id": doc.get("sport_id", []),
-#         "join_date": doc.get("join_date").date() if doc.get("join_date") else date.today(),
-#         "last_edit_date": doc.get("last_edit_date").date() if doc.get("last_edit_date") else date.today(),
-#         "role": "student"
-#     } 
 
 def transform_student_doc_to_model(doc: dict) -> dict:
     def parse_date(date_str):
@@ -268,23 +146,6 @@ def transform_student_doc_to_model(doc: dict) -> dict:
         "last_edit_date": parse_date(doc.get("last_edit_date")),
         "role": "student"
     }
-# Function to log in a user with email and password
-# async def login_service(email: str, password: str):
-#     """Authenticate a user based on email and password."""
-#     # Check if user exists in the database (this is simplified - you can check for Admin, Student, Teacher)
-#     user = await db["users"].find_one({"email": email})
-    
-#     if not user:
-#         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-#     # Verify the password
-#     if not verify_password(password, user["password"]):
-#         raise HTTPException(status_code=401, detail="Invalid credentials")
-
-#     # Create access token (JWT)
-#     access_token = create_access_token(data={"sub": str(user["_id"]), "role": user["role"]})
-    
-#     return {"access_token": access_token, "token_type": "bearer"}
 
 async def login_service(email: str, password: str):
     for collection_name, role in [("admin", "admin"), ("student", "student"), ("teacher", "teacher")]:
@@ -297,19 +158,6 @@ async def login_service(email: str, password: str):
             })
             return {"access_token": access_token, "token_type": "bearer"}
     raise HTTPException(status_code=401, detail="Invalid credentials")
-# async def login_service(email: str, password: str):
-#     # Try to find user in each collection
-#     for collection_name in ["admins", "students", "teachers"]:
-#         user = await db[collection_name].find_one({"email": email})
-#         if user and verify_password(password, user["password"]):
-#             access_token = create_access_token(data={
-#                 "sub": str(user["_id"]),  # this will now be a valid ObjectId string
-#                 "role": user["role"]
-#             })
-#             return {"access_token": access_token, "token_type": "bearer"}
-
-#     raise HTTPException(status_code=401, detail="Invalid credentials")
-
 
 # Function to register an admin
 async def register_admin(admin_data: AdminModel):

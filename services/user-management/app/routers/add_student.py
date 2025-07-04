@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends,Request
+from fastapi import APIRouter, HTTPException, Depends
 from app.models.student_model import StudentRegistration
 from app.services.student_service import register_student
 # from app.utils.auth import get_current_user  # Import the token verification function

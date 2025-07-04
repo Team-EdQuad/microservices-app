@@ -90,7 +90,7 @@ async def save_login_details(username: str, user_id: str, role: str, user_key: s
         "event_type": event_type,
         "login_type": login_type,
         "logout_type": "unknown",
-        "timestamp": timestamp
+        "loginTime": timestamp
     }
     await collection.insert_one(log_entry)
 

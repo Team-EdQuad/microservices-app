@@ -108,6 +108,7 @@ async def get_student_assignments(student_id: str, class_id: str):
 
 
                 assignment_timeline.append({
+                "assignment_id": assignment["assignment_id"],
                 "assignment_name": assignment["assignment_name"],
                 "subject_name": subject["subject_name"],
                 "class_id": class_id,

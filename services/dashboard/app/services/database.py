@@ -33,6 +33,8 @@ admin_table = db["admin"]
 admin_table = db["admin"]
 student_login_table = db["student_login_details"]
 
+perf_prediction_table = db["student_perf_predictions"]
+
 
 
 

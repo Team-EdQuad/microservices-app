@@ -13,7 +13,7 @@ from app.models.teacher_model import TeacherModel
 from typing import Optional,Union
 
 # Set up the password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Secret key for encoding JWT
 SECRET_KEY = "mysecretkey"  # Use a secure secret key for production
@@ -34,11 +34,14 @@ def parse_date(value: Optional[Union[str, datetime, date]]) -> Optional[datetime
     
 # Function to hash passwords
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    # return pwd_context.hash(password)
+    return password
 
 # Function to verify password
+# def verify_password(plain_password: str, hashed_password: str) -> bool:
+#     return pwd_context.verify(plain_password, hashed_password)
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    return plain_password == hashed_password 
 
 # Function to create JWT tokens
 def create_access_token(data: dict, expires_delta: timedelta = timedelta(hours=1)) -> str:
@@ -219,7 +222,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
             }
             return TeacherModel(**teacher_data)
 
-    except jwt.PyJWTError:
+    except jwt.JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 

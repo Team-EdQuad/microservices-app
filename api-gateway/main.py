@@ -17,7 +17,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'service
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, APIRouter, Body, UploadFile, File, Form
 from services.nonacademic import get_all_sports, create_sport, get_all_clubs, create_club, filter_sports
-from services.dashboard import get_student_progress, get_student_assignments,filter_assignments,sort_assignments, get_student_attendance,get_student_exam_marks,monthly_attendance, current_weekly_attendance,non_academic_attendance,engagement_score
+from services.dashboard import get_student_progress, get_student_assignments,filter_assignments,sort_assignments, get_student_attendance,get_student_exam_marks,monthly_attendance, current_weekly_attendance,non_academic_attendance,engagement_score, model_features,get_model_feedback
 from services.dashboard import get_teacher_assignments, get_exam_marks_teacher, get_student_progress_teacher, get_weekly_attendance,get_all_Classes
 from services.dashboard import get_exam_marks_admin,  get_student_progress_admin, get_weekly_attendance_admin, get_stats, get_all_users
 
@@ -461,6 +461,20 @@ async def dashboard_non_academic_attendance(student_id: str, class_id: str):
 async def dashboard_engagement_score(student_id: str, class_id: str):
     try:
         return await  engagement_score(student_id, class_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/dashboard/{student_id}/{class_id}/model-features")
+async def dashboard_model_features(student_id: str, class_id: str):
+    try:
+        return await model_features(student_id, class_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.get("/api/dashboard/{student_id}/{class_id}/model-feedback")
+async def dashboard_model_feedback(student_id: str, class_id: str):
+    try:
+        return await get_model_feedback(student_id, class_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

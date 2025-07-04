@@ -14,6 +14,7 @@ def all_progress(progresses):
 
 def individual_assignment(assignment):
     return {
+        "assignment_id": assignment["assignment_id"],
         "assignment_name": assignment["assignment_name"],
         "subject_name": assignment["subject_name"],
         "class_id": assignment["class_id"],

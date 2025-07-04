@@ -6,7 +6,7 @@ from typing import List
 
 from ..utils.grading_gemini import grade_answer
 from ..utils.grading_deepseek import grade_answer_deepseek
-from ..models.academic import AssignmentListResponse, AssignmentViewResponse, ContentResponse, MarksResponse, SubjectResponse,AssignmentMarksResponse, SubmissionResponse
+from ..models.academic import StatusUpdateRequest,AssignmentListResponse, AssignmentViewResponse, ContentResponse, MarksResponse, SubjectResponse,AssignmentMarksResponse, SubmissionResponse
 from .database import db
 from ..utils.file_utils import extract_text
 from ..utils.grading_gemini import grade_answer
@@ -519,10 +519,13 @@ async def submit_assignment(student_id: str, assignment_id: str, file: UploadFil
 
 
 
-#update content status  (mark as done)
+
+# update content status (mark as done)
 @router.post("/content/{content_id}")
-async def update_content_status(content_id: str):
-    # Step 1: Fetch class_id and subject_id from the content collection
+async def update_content_status(content_id: str, payload: StatusUpdateRequest):
+    student_id = payload.student_id
+
+    # Step 1: Fetch details from the content collection
     content = db["content"].find_one({"content_id": content_id})
     if not content:
         raise HTTPException(status_code=404, detail="Content not found")
@@ -530,32 +533,34 @@ async def update_content_status(content_id: str):
     class_id = content.get("class_id")
     subject_id = content.get("subject_id")
     
-    # Step 2: Fetch teacher_id from the teacher collection using class_id
-    teacher = db["teacher"].find_one({"class_id": class_id})
-    if not teacher:
-        raise HTTPException(status_code=404, detail="Teacher not found for this class")
-    
-    teacher_id = teacher.get("teacher_id")
-    
-    # Step 3: Update or Insert (Upsert) in student_content_status
-    result = db["student_content_status"].update_one(
-        {"class_id": class_id, "subject_id": subject_id, "content_id": content_id},
+    # Step 2: Update or Insert the student's content status
+    result = db["student_content"].update_one(
+        # Filter remains the same
+        {
+            "student_id": student_id, 
+            "content_id": content_id
+        },
         {
             "$set": {
+                "student_id": student_id,
+                "content_id": content_id,
                 "class_id": class_id,
                 "subject_id": subject_id,
-                "content_status": True
+                # --- THIS IS THE CORRECTED LINE ---
+                # Now matches your data structure: status: "Active"
+                "status": "Active"  
             },
-            "$inc": {
-                "access_frequency": 1  # Increment access frequency by 1 on every content click
-            }
         },
-        upsert=True  # Insert a new document if no match is found
+        upsert=True
     )
     
-    # Step 4: Return success message
-    if result.modified_count or result.upserted_id:
-        return {"message": "Content status updated successfully", "class_id": class_id, "subject_id": subject_id, "teacher_id": teacher_id}
+    # Step 3: Return success message using the robust check
+    if result.modified_count or result.upserted_id or result.matched_count > 0:
+        return {
+            "message": "Content status is successfully marked as complete", 
+            "student_id": student_id,
+            "class_id": class_id, 
+            "subject_id": subject_id, 
+        }
     else:
-        return {"message": "Content status update failed"}
-
+        return {"message": "Content status update failed for an unknown reason"}

@@ -191,14 +191,13 @@ async def submit_assignment_file(
     file: UploadFile = File(...)
 ):
     return await upload_assignment_file(student_id, assignment_id, file)
-    
+
+class StatusUpdateRequest(BaseModel):
+    student_id: str
 
 @app.post("/api/content/{content_id}")
-async def mark_content_completed(content_id: str):
-    success = await mark_content_done(content_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Content not found or not accessible")
-    return {"message": "Content marked as completed"}
+async def mark_content_completed(content_id: str, payload: StatusUpdateRequest):
+    return await mark_content_done(content_id, payload.student_id)
 
 ###teacher 
 

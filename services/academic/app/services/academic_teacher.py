@@ -1,5 +1,4 @@
 from datetime import datetime
-import os
 import uuid
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
@@ -11,7 +10,6 @@ from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 import io
 import logging
 from tenacity import retry, stop_after_attempt, wait_exponential
-from pymongo.errors import PyMongoError
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

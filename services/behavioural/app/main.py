@@ -102,8 +102,6 @@ async def get_avg_time_spent(subject_id: str, class_id: str):
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 
-
-
 @router.get("/SiteAverageActiveTime/{class_id}")
 async def get_site_average_active_time(class_id: str):
     try:
@@ -190,8 +188,6 @@ async def get_site_average_active_time(class_id: str):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
-
-
 
 
 @router.get("/ResourceAccessFrequency/{subject_id}/{class_id}")

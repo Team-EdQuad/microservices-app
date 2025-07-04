@@ -103,6 +103,17 @@ async def Visualize_data_list(subject_id: str, class_id: str):
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(exc)}")
 
 
+async def update_collection_active_time(subject_id: str, class_id: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(f"{BEHAVIOURAL_SERVICE_URL}/update_weekly_data/{subject_id}/{class_id}")
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(exc)}")
+
 
 
 async def call_prediction_service(

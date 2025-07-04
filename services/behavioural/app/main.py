@@ -2,7 +2,6 @@ from fastapi import FastAPI, APIRouter, HTTPException, logger
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import status
 from datetime import datetime, timedelta, timezone
-from pydantic import BaseModel
 import pytz  
 from pymongo.collection import Collection
 from typing import Dict
@@ -10,7 +9,7 @@ from .services.database import db
 from .services.predict_active_time import router as predict_router
 import traceback
 import logging
-
+from .models.Behavioral import UpdateResponse
 
 
 logger = logging.getLogger(__name__)
@@ -405,28 +404,9 @@ async def close_content_access(request_data: Dict):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-
-class UpdateResponse(BaseModel):
-    success: bool
-    message: str
-    subject_id: str
-    class_id: str
-    updated_week: int
-    calculated_data: dict
-
-
-
-
-from fastapi import APIRouter, HTTPException, status
-from pymongo.collection import Collection
-from datetime import datetime, timezone, timedelta
-import pytz
-import logging
-
 @router.post(
     "/update_weekly_data/{subject_id}/{class_id}",
-    response_model=UpdateResponse,
-    summary="Calculate and upsert the current week's real data for active time prediction."
+    response_model=UpdateResponse
 )
 async def update_weekly_data(subject_id: str, class_id: str):
     try:
@@ -552,9 +532,6 @@ async def update_weekly_data(subject_id: str, class_id: str):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}"
         )
-
-
-
 
 
 

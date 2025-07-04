@@ -32,7 +32,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/user-management/login")
 
 
 from services.academic import  view_auto_graded_submissions_request,review_auto_graded_marks_request,get_student_list_by_class_and_subject,get_submission_file_by_id,get_assignment_file_by_id,get_content_by_id,get_content_file_by_id,create_assignment_request,upload_content_request,view_ungraded_manual_submissions,update_manual_marks,add_exam_marks_request,get_subject_names,get_student_content,get_all_assignments,get_assignment_by_id,get_assignment_marks,get_exam_marks, upload_assignment_file ,mark_content_done,get_subject_and_class_for_teacher
-from services.behavioural import call_prediction_service,model_train,Visualize_data_list,time_spent_on_resources,average_active_time,resource_access_frequency,content_access_start,content_access_close
+from services.behavioural import update_collection_active_time,call_prediction_service,model_train,Visualize_data_list,time_spent_on_resources,average_active_time,resource_access_frequency,content_access_start,content_access_close
 
 from services.attendance import attendanceRouter
 
@@ -336,7 +336,6 @@ async def close_content_access(
     return await content_access_close(student_id, content_id)
 
 
-
 # 1. Visualization endpoint
 @app.get("/api/visualize_data/{subject_id}/{class_id}")
 async def Visualize(subject_id: str, class_id: str):
@@ -363,6 +362,16 @@ async def gateway_prediction_endpoint(
 @app.post("/api/train/{subject_id}/{class_id}")
 async def TrainModel(subject_id: str, class_id: str):
     return await model_train(subject_id, class_id)
+
+
+
+@app.post("/api/update_collection/{subject_id}/{class_id}")
+async def Update(subject_id: str, class_id: str):
+    return await update_collection_active_time(subject_id, class_id)
+
+
+
+
 
 
 

@@ -18,6 +18,14 @@ class EndAccess(BaseModel):
 
 
 
+class UpdateResponse(BaseModel):
+    success: bool
+    message: str
+    subject_id: str
+    class_id: str
+    updated_week: int
+    calculated_data: dict
+
 
 class PredictionOutput(BaseModel):
     predicted_active_time: float

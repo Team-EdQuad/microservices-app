@@ -417,34 +417,59 @@ class UpdateResponse(BaseModel):
 
 
 
+from fastapi import APIRouter, HTTPException, status
+from pymongo.collection import Collection
+from datetime import datetime, timezone, timedelta
+import pytz
+import logging
+
 @router.post(
     "/update_weekly_data/{subject_id}/{class_id}",
     response_model=UpdateResponse,
-    summary="Calculate and insert the current week's real data for active time prediction."
+    summary="Calculate and upsert the current week's real data for active time prediction."
 )
 async def update_weekly_data(subject_id: str, class_id: str):
     try:
-        # --- Collections ---
-        prediction_collection: Collection = db["active_time_prediction"]
-        behavioral_collection: Collection = db["behavioral_analysis"]
-        assignment_collection: Collection = db["assignment"]
-        content_collection: Collection = db["content"]
+        # --- 1. Collections ---
+        pred_coll: Collection = db["active_time_prediction"]
+        behav_coll: Collection = db["behavioral_analysis"]
+        asn_coll: Collection = db["assignment"]
+        cont_coll: Collection = db["content"]
 
-        # --- Get the week range ---
+        # --- 2. Compute this week's UTC range (Mon 00:00 → next Mon 00:00) ---
         week_start, week_end = get_current_week_range()
 
-        # --- Get the last Weeknumber and increment it ---
-        last_entry = prediction_collection.find_one(
-            {"subject_id": subject_id, "class_id": class_id},
-            sort=[("Weeknumber", -1)]
-        )
-        last_week = last_entry.get("Weeknumber", 0) if last_entry else 0
-        current_week_number = last_week + 1
+        # --- 3. Check if we've already inserted **real** data for THIS week ---
+        real_filter = {
+            "subject_id": subject_id,
+            "class_id": class_id,
+            "WeekStartDate": week_start,
+            "WeekEndDate": week_end,
+            "data": "1"
+        }
+        real_entry = pred_coll.find_one(real_filter)
 
-        # --- Debug print ---
-        logger.info(f"Generating data for Weeknumber {current_week_number} ({week_start} to {week_end})")
+        if real_entry:
+            # A real row already exists this week—reuse its Weeknumber
+            current_week_number = real_entry["Weeknumber"]
+        else:
+            # First real call this week → bump from the last synthetic week
+            last_synth = pred_coll.find_one(
+                {
+                    "subject_id": subject_id,
+                    "class_id": class_id,
+                    # exclude any real data
+                    "data": {"$ne": "1"}
+                },
+                sort=[("Weeknumber", -1)]
+            )
+            last_week = last_synth["Weeknumber"] if last_synth else 0
+            current_week_number = last_week + 1
 
-        # --- Behavioral data aggregation ---
+        logger.info(f"Using Weeknumber={current_week_number} for real data "
+                    f"(range {week_start} → {week_end})")
+
+        # --- 4. Aggregate TotalActiveTime ---
         b_pipeline = [
             {"$match": {
                 "subject_id": subject_id,
@@ -458,23 +483,20 @@ async def update_weekly_data(subject_id: str, class_id: str):
             {"$match": {
                 "parsedAccessTime": {"$gte": week_start, "$lt": week_end}
             }},
-            {"$group": {
-                "_id": None,
-                "total": {"$sum": "$durationMinutes"}
-            }}
+            {"$group": {"_id": None, "total": {"$sum": "$durationMinutes"}}}
         ]
-        b_res = list(behavioral_collection.aggregate(b_pipeline))
-        total_active_time = round(b_res[0]["total"], 2) if b_res else 0.0
+        b_res = list(behav_coll.aggregate(b_pipeline))
+        total_active = round(b_res[0]["total"], 2) if b_res else 0.0
 
-        # --- Assignments check ---
-        assignment_count = assignment_collection.count_documents({
+        # --- 5. SpecialEventThisWeek (assignments) ---
+        asn_count = asn_coll.count_documents({
             "subject_id": subject_id,
             "class_id": class_id,
             "created_at": {"$gte": week_start, "$lt": week_end}
         })
-        special_event_flag = 1 if assignment_count > 0 else 0
+        special_event = 1 if asn_count > 0 else 0
 
-        # --- Content count ---
+        # --- 6. ResourcesUploadedThisWeek (content) ---
         c_pipeline = [
             {"$match": {
                 "subject_id": subject_id,
@@ -489,30 +511,35 @@ async def update_weekly_data(subject_id: str, class_id: str):
             }},
             {"$count": "cnt"}
         ]
-        c_res = list(content_collection.aggregate(c_pipeline))
+        c_res = list(cont_coll.aggregate(c_pipeline))
         resources_uploaded = c_res[0]["cnt"] if c_res else 0
 
-        # --- Final document to insert ---
+        # --- 7. Build the upsert document ---
         doc = {
             "Weeknumber": current_week_number,
-            "TotalActiveTime": total_active_time,
+            "TotalActiveTime": total_active,
             "subject_id": subject_id,
             "class_id": class_id,
-            "SpecialEventThisWeek": special_event_flag,
+            "SpecialEventThisWeek": special_event,
             "ResourcesUploadedThisWeek": resources_uploaded,
             "WeekStartDate": week_start,
             "WeekEndDate": week_end,
-            "data": "1"  # This marks it as real data
+            "data": "1"
         }
 
-        # --- Insert new document (never update old weeks) ---
-        prediction_collection.insert_one(doc)
-        
+        # --- 8. Upsert it (create or update the same week) ---
+        pred_coll.update_one(
+            real_filter,        # matches existing real row or creates new one
+            {"$set": doc},
+            upsert=True
+        )
 
+        # Remove any internal _id before returning
         doc.pop("_id", None)
+
         return UpdateResponse(
             success=True,
-            message="Real weekly data inserted successfully (Weeknumber incremented).",
+            message="Real weekly data upserted successfully.",
             subject_id=subject_id,
             class_id=class_id,
             updated_week=current_week_number,
@@ -520,11 +547,12 @@ async def update_weekly_data(subject_id: str, class_id: str):
         )
 
     except Exception as e:
-        logger.exception(f"Failed to insert real data for {subject_id}/{class_id}")
+        logger.exception(f"Error upserting real weekly data for {subject_id}/{class_id}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}"
         )
+
 
 
 

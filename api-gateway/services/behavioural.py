@@ -114,8 +114,6 @@ async def update_collection_active_time(subject_id: str, class_id: str):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(exc)}")
 
-
-
 async def call_prediction_service(
     subject_id: str,
     class_id: str,

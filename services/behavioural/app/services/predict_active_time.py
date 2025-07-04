@@ -210,20 +210,47 @@ async def get_model_status(subject_id: str, class_id: str):
     else:
         return ModelStatus(model_exists=False, model_info=None)
 
-# The /visualize_data endpoint remains unchanged as it already supports filtering
 @router.get("/visualize_data/{subject_id}/{class_id}")
 async def visualize_data(subject_id: str, class_id: str):
-    """Return x and y axis arrays for visualization filtered by subject_id and class_id"""
     try:
         db = client[DATABASE_NAME]
         collection = db[COLLECTION_NAME]
-        query = {"subject_id": subject_id, "class_id": class_id}
+
+        # Query without data filter first
+        query = {
+            "subject_id": subject_id,
+            "class_id": class_id
+        }
+
+        # Sort by Weeknumber
         cursor = collection.find(query).sort("Weeknumber", 1)
+
         x_values, y_values = [], []
         for document in cursor:
-            x_values.append(document.get("Weeknumber"))
-            y_values.append(document.get("TotalActiveTime"))
+            # Check for data field with different possible names
+            data_value = None
+            if "data" in document:
+                data_value = document["data"]
+            elif " data" in document:
+                data_value = document[" data"]
+            
+            # Only include if data field matches our criteria
+            if data_value in ["1", 1]:
+                weeknumber = document.get("Weeknumber")
+                total_active_time = document.get("TotalActiveTime")
+                
+                if weeknumber is not None and total_active_time is not None:
+                    x_values.append(weeknumber)
+                    y_values.append(total_active_time)
+
         return {"x": x_values, "y": y_values}
+
     except Exception as e:
         logger.error(f"Visualization endpoint error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
+
+

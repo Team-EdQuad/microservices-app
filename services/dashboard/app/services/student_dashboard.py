@@ -9,8 +9,13 @@ from bson.objectid import ObjectId
 from typing import List
 from datetime import datetime
 from collections import defaultdict
+import logging
+import traceback
 
 student_dashboard_router = APIRouter()
+
+logger = logging.getLogger("dashboard_logger")
+logger.setLevel(logging.DEBUG)
 
 @student_dashboard_router.get("/{student_id}/{class_id}/progress", response_model=List[dict])
 async def get_student_subject_progress(student_id: str, class_id: str):
@@ -55,71 +60,157 @@ async def get_student_subject_progress(student_id: str, class_id: str):
         raise HTTPException(status_code=500, detail=f"Error retrieving student progress: {str(e)}")
     
 
-
 @student_dashboard_router.get("/{student_id}/{class_id}/assignments", response_model=List[dict])
 async def get_student_assignments(student_id: str, class_id: str):
     try:
-        student = student_table.find_one({"student_id": student_id})
+        logger.info(f"Fetching assignments for Student: {student_id}, Class: {class_id}")
 
-        if not student:
-            raise HTTPException(status_code=404, detail=f"Student with ID {student_id} not found")
-        
-        
-        if student.get("class_id") != class_id:
-            raise HTTPException(status_code=404, detail=f"Student with ID {student_id} is not enrolled in class with ID {class_id}")
-        
-        student_subjects = student.get("subject_id" ,[])
-     
-        if not student_subjects:
-            raise HTTPException(status_code=404, detail=f"No subjects found for Student with ID {student_id}")
-        
+        try:
+            student = student_table.find_one({"student_id": student_id})
+            if not student:
+                logger.warning(f"Student not found: {student_id}")
+                raise HTTPException(status_code=404, detail=f"Student with ID {student_id} not found")
+            if student.get("class_id") != class_id:
+                logger.warning(f"Class mismatch for student {student_id}")
+                raise HTTPException(status_code=404, detail=f"Student with ID {student_id} is not enrolled in class {class_id}")
+        except Exception as e:
+            logger.exception("Error retrieving student data")
+            raise
+
+        try:
+            student_subjects = student.get("subject_id", [])
+            if not student_subjects:
+                logger.warning(f"No subjects for student {student_id}")
+                raise HTTPException(status_code=404, detail=f"No subjects found for student {student_id}")
+        except Exception as e:
+            logger.exception("Error accessing student subjects")
+            raise
+
         assignment_timeline = []
-        
 
         for subject_id in student_subjects:
-            subject = subject_table.find_one({"subject_id": subject_id})
-            if not subject:
-                continue 
+            try:
+                subject = subject_table.find_one({"subject_id": subject_id})
+                if not subject:
+                    logger.warning(f"Subject not found: {subject_id}")
+                    continue
+            except Exception as e:
+                logger.exception(f"Error retrieving subject {subject_id}")
+                continue
 
-
-            assignments = assignment_table.find({"subject_id":subject_id, "class_id": class_id })
-            submissions = list(submission_table.find({"student_id": student_id, "class_id": class_id, "subject_id": subject_id}))
-          
+            try:
+                assignments = assignment_table.find({"subject_id": subject_id, "class_id": class_id})
+                submissions = list(submission_table.find({
+                    "student_id": student_id,
+                    "class_id": class_id,
+                    "subject_id": subject_id
+                }))
+            except Exception as e:
+                logger.exception(f"Error querying assignments or submissions for subject {subject_id}")
+                continue
 
             for assignment in assignments:
-                assignment["status"] = "Not Completed"
-                for submission in submissions:
-                    if submission["assignment_id"] == assignment["assignment_id"]:
-                        assignment["status"] = "Completed"
-                        break
+                try:
+                    assignment["status"] = "Not Completed"
+                    for submission in submissions:
+                        if submission.get("assignment_id") == assignment.get("assignment_id"):
+                            assignment["status"] = "Completed"
+                            break
 
-                deadline = assignment.get("deadline")
-                if isinstance(deadline, str):
-                    deadline = datetime.fromisoformat(deadline)
-                
+                    deadline = assignment.get("deadline")
+                    if isinstance(deadline, str):
+                        try:
+                            deadline = datetime.fromisoformat(deadline)
+                        except ValueError as ve:
+                            logger.warning(f"Invalid date format in assignment {assignment.get('assignment_id')}: {deadline}")
+                            deadline = None
 
-               
-                if assignment["status"] != "Completed":
-                    if deadline and deadline < datetime.now():
-                        assignment["status"] = "Overdue"
+                    if assignment["status"] != "Completed":
+                        if deadline and deadline < datetime.now():
+                            assignment["status"] = "Overdue"
+                        else:
+                            assignment["status"] = "Upcoming"
 
-                    else :
-                        assignment["status"] = "Upcoming"
+                    assignment_timeline.append({
+                        "assignment_id": assignment.get("assignment_id"),
+                        "assignment_name": assignment.get("assignment_name"),
+                        "subject_name": subject.get("subject_name"),
+                        "class_id": class_id,
+                        "deadline": deadline if deadline else None,
+                        "status": assignment["status"]
+                    })
+                except Exception as e:
+                    logger.exception(f"Error processing assignment {assignment.get('assignment_id')}")
 
-
-                assignment_timeline.append({
-                "assignment_id": assignment["assignment_id"],
-                "assignment_name": assignment["assignment_name"],
-                "subject_name": subject["subject_name"],
-                "class_id": class_id,
-                "deadline": deadline if deadline else None,
-                "status": assignment["status"]
-                })
-           
         return all_assignments(assignment_timeline)
 
     except Exception as e:
+        logger.exception("Unhandled error in get_student_assignments")
         raise HTTPException(status_code=500, detail=f"Error retrieving student assignments: {str(e)}")
+# @student_dashboard_router.get("/{student_id}/{class_id}/assignments", response_model=List[dict])
+# async def get_student_assignments(student_id: str, class_id: str):
+#     try:
+#         student = student_table.find_one({"student_id": student_id})
+
+#         if not student:
+#             raise HTTPException(status_code=404, detail=f"Student with ID {student_id} not found")
+        
+        
+#         if student.get("class_id") != class_id:
+#             raise HTTPException(status_code=404, detail=f"Student with ID {student_id} is not enrolled in class with ID {class_id}")
+        
+#         student_subjects = student.get("subject_id" ,[])
+     
+#         if not student_subjects:
+#             raise HTTPException(status_code=404, detail=f"No subjects found for Student with ID {student_id}")
+        
+#         assignment_timeline = []
+        
+
+#         for subject_id in student_subjects:
+#             subject = subject_table.find_one({"subject_id": subject_id})
+#             if not subject:
+#                 continue 
+
+
+#             assignments = assignment_table.find({"subject_id":subject_id, "class_id": class_id })
+#             submissions = list(submission_table.find({"student_id": student_id, "class_id": class_id, "subject_id": subject_id}))
+          
+
+#             for assignment in assignments:
+#                 assignment["status"] = "Not Completed"
+#                 for submission in submissions:
+#                     if submission["assignment_id"] == assignment["assignment_id"]:
+#                         assignment["status"] = "Completed"
+#                         break
+
+#                 deadline = assignment.get("deadline")
+#                 if isinstance(deadline, str):
+#                     deadline = datetime.fromisoformat(deadline)
+                
+
+               
+#                 if assignment["status"] != "Completed":
+#                     if deadline and deadline < datetime.now():
+#                         assignment["status"] = "Overdue"
+
+#                     else :
+#                         assignment["status"] = "Upcoming"
+
+
+#                 assignment_timeline.append({
+#                 "assignment_id": assignment["assignment_id"],
+#                 "assignment_name": assignment["assignment_name"],
+#                 "subject_name": subject["subject_name"],
+#                 "class_id": class_id,
+#                 "deadline": deadline if deadline else None,
+#                 "status": assignment["status"]
+#                 })
+           
+#         return all_assignments(assignment_timeline)
+
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"Error retrieving student assignments: {str(e)}")
     
     
 

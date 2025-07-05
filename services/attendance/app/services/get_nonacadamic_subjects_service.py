@@ -9,8 +9,8 @@ async def get_student_nonacadamic_subjects_service(student_id: str):
         if not student_doc:
             raise HTTPException(status_code=404, detail="Student not found")
 
-        sports_ids = student_doc.get("sports", [])
-        clubs_ids = student_doc.get("clubs", [])
+        sports_ids = student_doc.get("sport_id", [])
+        clubs_ids = student_doc.get("club_id", [])
 
         subject_ids = sports_ids + clubs_ids
 

@@ -7,6 +7,8 @@ import httpx
 
 from app.db.database import get_database
 from app.services.auth_service import create_access_token
+from app.anomaly_detection.workers.anomaly_detector import LoginInput, detect_login_anomaly_logic
+
 
 router = APIRouter()
 
@@ -93,6 +95,23 @@ async def save_login_details(username: str, user_id: str, role: str, user_key: s
         "loginTime": timestamp
     }
     await collection.insert_one(log_entry)
+
+    # Construct timestamp string
+    timezone = pytz.timezone('Asia/Colombo')
+    timestamp = datetime.datetime.now(timezone).strftime('%Y-%m-%d %H:%M:%S')
+
+    # Prepare the input for anomaly detection
+    anomaly_input = LoginInput(
+        username=username,
+        role=role,
+        timestamp=timestamp,
+        location=await get_location(get_client_ip(req)),
+        device_info=req.headers.get("user-agent", "Unknown")
+    )
+
+    # Run anomaly detection and save result (not returned to user)
+    detect_login_anomaly_logic(anomaly_input, get_database())
+
 
 @router.post("/login")
 async def login(req: Request, username: str = Form(...), password: str = Form(...)):

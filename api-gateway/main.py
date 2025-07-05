@@ -27,7 +27,7 @@ from services.dashboard import get_student_progress, get_student_assignments,fil
 from services.dashboard import get_teacher_assignments, get_exam_marks_teacher, get_student_progress_teacher, get_weekly_attendance,get_all_Classes
 from services.dashboard import get_exam_marks_admin,  get_student_progress_admin, get_weekly_attendance_admin, get_stats, get_all_users
 
-from services.usermanagement import login_user, add_admin, add_student, add_teacher, delete_user,edit_profile, update_password, get_profile, serialize_dates,logout_user
+from services.usermanagement import login_user, add_admin, add_student, add_teacher, delete_user,edit_profile, update_password, get_profile, serialize_dates,logout_user,fetch_anomaly_results
 
 from schemas.usermanagement import LoginRequest, AdminCreate,StudentRegistration,TeacherCreate, UserProfileUpdate, UpdatePasswordRequest
 from services.calendar import get_assignment_deadlines
@@ -51,14 +51,6 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 
-# app.add_middleware(
-#     CORSMiddleware,
-#     # allow_origins=["*"],  # Frontend URL
-#     allow_origins=["http://localhost:5173"],  # Frontend URL
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
 
 app.add_middleware(
     CORSMiddleware,
@@ -138,6 +130,40 @@ async def profile(token: str = Depends(oauth2_scheme)):
     profile_data = await get_profile(authorization=auth_header)
     print(f"Profile data response: {profile_data}")
     return profile_data
+
+@app.get("/api/anomaly-detection/results")
+async def api_get_anomaly_results(
+    username: Optional[str] = Query(None),
+    role: Optional[str] = Query(None),
+    token: str = Depends(oauth2_scheme)
+):
+    # authorization = f"Bearer {token}"
+    from services.usermanagement import fetch_anomaly_results
+    return await fetch_anomaly_results(username, role, token)
+
+# MODIFIED ANOMALY DETECTION RESULTS ENDPOINT IN API GATEWAY
+# @app.get("/api/anomaly-detection/results")
+# async def api_get_anomaly_results(
+#     request: Request, # <-- Inject Request object to manually get header
+#     username: str = Query(...),
+#     role: str = Query(...)
+#     # Removed token: str = Depends(oauth2_scheme) here
+# ):
+#     # Get Authorization header directly from the request
+#     authorization_header = request.headers.get("Authorization")
+#     if not authorization_header:
+#         raise HTTPException(status_code=401, detail="Authorization header missing")
+
+#     # Extract token string (remove "Bearer ")
+#     if not authorization_header.startswith("Bearer "):
+#         raise HTTPException(status_code=401, detail="Invalid Authorization header format. Must be 'Bearer <token>'")
+#     token_string = authorization_header.replace("Bearer ", "")
+
+#     if not token_string:
+#         raise HTTPException(status_code=401, detail="Bearer token missing after 'Bearer ' prefix")
+
+#     # Pass the raw token string to the service function
+#     return await fetch_anomaly_results(username, role, token_string)
 
 # NEW CALENDAR ENDPOINT
 @app.get("/api/calendar/assignments/deadlines", response_model=List[Dict[str, Any]])

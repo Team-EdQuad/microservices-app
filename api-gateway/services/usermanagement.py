@@ -5,6 +5,14 @@ from pathlib import Path
 import json
 from datetime import date
 import shutil
+from fastapi.security import OAuth2PasswordBearer
+from typing import Optional
+from fastapi import Query
+
+
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/user-management/login")
+
 # from app.services.auth_service import get_current_user
 # from app.models.admin_model import AdminModel
 
@@ -248,3 +256,64 @@ def serialize_dates(data: dict):
             data[key] = [v.isoformat() if isinstance(v, date) else v for v in value]
     return data
 
+# @router.get("/api/anomaly-detection/results")
+async def fetch_anomaly_results(
+    # If 'authorization' is truly a distinct, required header passed here,
+    # it would go here as well, before any optional arguments.
+    # If not used, keep it removed as per previous suggestion.
+    username: Optional[str] = None, # Now, optional arguments with defaults
+    role: Optional[str] = None,
+    token: Optional[str] = None,
+):
+    headers = {"Authorization": f"Bearer {token}"}
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{USER_MANAGEMENT_SERVICE_URL}/anomaly-detection/results",
+                params={"username": username, "role": role},
+                headers=headers
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        # Return the actual response content from the service
+        detail = exc.response.text
+        print(f"HTTPStatusError: {detail}")
+        raise HTTPException(status_code=exc.response.status_code, detail=detail)
+    except Exception as e:
+        print(f"Unexpected error in fetch_anomaly_results: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
+# @router.get("/anomaly-detection/results")
+# async def get_anomaly_results(
+#     username: Optional[str] = Query(None),
+#     role: Optional[str] = Query(None),
+#     current_user=Depends(get_current_user)
+# ):
+#     try:
+#         if current_user.role != "admin":
+#             raise HTTPException(status_code=403, detail="Only admins can access anomaly results")
+
+#         db = get_database()
+#         query = {}
+
+#         if username:
+#             query["username"] = username
+#         if role:
+#             query["role"] = role
+
+#         cursor = db["login_anomaly_results"].find(query).sort("timestamp", -1)
+#         results = []
+#         async for doc in cursor:
+#             doc["_id"] = str(doc["_id"])  # Convert ObjectId to string
+#             results.append(doc)
+
+#         return {"results": results}
+#     except Exception as e:
+#         # Log the exception to console or file for debugging
+#         print("Exception in anomaly results endpoint:", e)
+#         raise HTTPException(status_code=500, detail=str(e))

@@ -9,6 +9,13 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from jose import jwt
 import logging
 
+# --- NEW IMPORTS FOR ANOMALY DETECTION ---
+from app.anomaly_detection.workers.anomaly_detector import LoginInput, detect_login_anomaly_logic, retrain_models
+# Assuming your user-management's database connection is in app/db/database.py
+from app.db.database import get_database # Import your MongoDB client
+# --- END NEW IMPORTS ---
+from app.routers import anomaly
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -153,6 +160,40 @@ app.include_router(delete_user.router)  # Uncommented this
 app.include_router(admin_user_management.router)
 app.include_router(edit_profile.router)
 app.include_router(update_password.router)
+app.include_router(anomaly.router)
+
+
+
+# --- NEW ANOMALY DETECTION ENDPOINT ---
+@app.post("/anomaly-detection/detect-login-anomaly")
+async def detect_login_anomaly_api(
+    data: LoginInput,
+    # This endpoint can be called by anyone as part of login flow, or by admin
+    # current_user=Depends(get_current_user) # Uncomment if only authenticated users can trigger
+):
+    """
+    Endpoint to detect login anomalies based on provided input data.
+    This will save login attempts and anomaly results to MongoDB
+    and trigger model retraining.
+    """
+    try:
+        # Get the MongoDB database client
+        db_client = get_database() # Assuming get_database_client returns the 'db' object
+
+        # Trigger anomaly detection logic
+        result = detect_login_anomaly_logic(data=data, db_client=db_client)
+
+        # Trigger retraining in the background to avoid blocking the API response
+        # NOTE: Frequent retraining can be very resource-intensive.
+        # Consider a separate background worker or scheduled task for this in production.
+        # BackgroundTasks are good for fire-and-forget, but won't handle failures.
+        # background_tasks.add_task(retrain_models, db_client) # Uncomment if you want background retraining
+
+        return result
+    except Exception as e:
+        logger.error(f"Error during anomaly detection: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Error during anomaly detection process")
+# --- END NEW ANOMALY DETECTION ENDPOINT ---
 
 # Health check endpoint
 @app.get("/health")

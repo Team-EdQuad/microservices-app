@@ -1,89 +1,72 @@
-# from fastapi import APIRouter, Depends, HTTPException
-# from app.services.auth_service import get_current_user
-# from app.models.admin_model import AdminModel
-
-# router = APIRouter()
-
-# @router.get("/profile")
-# async def get_user_data(current_user: AdminModel = Depends(get_current_user)):
-#     """Fetch role-based and user-specific content."""
-#     if current_user.role == "admin":
-#         # Fetch admin-specific data (for example, all users)
-#         return {"message": "Admin data", "data": {"admin_details": "All admins data here"}}
-#     elif current_user.role == "student":
-#         # Fetch student-specific data
-#         return {"message": "Student data", "data": {"student_details": f"Data for {current_user.first_name} {current_user.last_name}"}}
-#     elif current_user.role == "teacher":
-#         # Fetch teacher-specific data
-#         return {"message": "Teacher data", "data": {"teacher_details": f"Data for {current_user.first_name} {current_user.last_name}"}}
-#     else:
-#         raise HTTPException(status_code=403, detail="Access denied")
-
-
-# user-management/app/routers/users.py
-
 from fastapi import APIRouter, Depends, HTTPException
-from app.models.admin_model import AdminModel # Or a more generic User type from your models
+from app.services.auth_service import get_current_user
+from app.models.admin_model import AdminModel
 
 router = APIRouter()
 
-# CHANGE /user-data to /profile to match the API Gateway
-@router.get("/profile") # <--- Changed this line
+# Your existing /profile endpoint (keep as is)
+@router.get("/profile")
 async def get_user_profile(current_user: AdminModel = Depends(get_current_user)):
     """Fetch role-based and user-specific content."""
-
-    profile_data = {} # Initialize empty dict for profile
+    profile_data = {}
 
     if current_user.role == "admin":
         profile_data = current_user.dict()
-        # profile_data = {
-        #     "role": "admin",
-        #     "admin_id": current_user.admin_id, # Assuming AdminModel has admin_id
-        #     "full_name": current_user.full_name, # Assuming AdminModel has full_name
-        #     "email": current_user.email,
-        #     "gender": current_user.gender,
-        #     "join_date": current_user.join_date,
-        #     "phone": current_user.phone
-        #     # ... include all fields you want for admin profile
-        # }
     elif current_user.role == "student":
-        # Fetch actual student data from your DB based on current_user.student_id
-        # Example:
-        # from app.db.student_crud import get_student_by_id
-        # profile_data = await get_student_by_id(current_user.student_id)
         profile_data = {
             "role": "student",
-            "student_id": current_user.student_id, # Assuming StudentModel passed to current_user
+            "student_id": current_user.student_id,
             "full_name": current_user.full_name,
             "email": current_user.email,
             "class_id": current_user.class_id,
-            "subjects": current_user.subject, # Assuming 'subject' field in your StudentRegistration model
+            "subjects": current_user.subject,
             "phone": current_user.phone
-            # ... include all fields for student profile
         }
     elif current_user.role == "teacher":
-        # Fetch actual teacher data from your DB based on current_user.teacher_id
-        # Example:
-        # from app.db.teacher_crud import get_teacher_by_id
-        # profile_data = await get_teacher_by_id(current_user.teacher_id)
         profile_data = {
             "role": "teacher",
-            "teacher_id": current_user.teacher_id, # Assuming TeacherModel passed to current_user
+            "teacher_id": current_user.teacher_id,
             "full_name": current_user.full_name,
             "email": current_user.email,
             "gender": current_user.gender,
             "subjects_classes": current_user.subjects_classes,
-            "phone": current_user.Phone_no # Note the 'Phone_no' casing
-            # ... include all fields for teacher profile
+            "phone": current_user.phone
         }
     else:
-        raise HTTPException(status_code=403, detail="Access denied: Unknown role")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: Unknown role")
 
     if not profile_data:
-        raise HTTPException(status_code=404, detail="Profile data not found for this user.")
-    
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile data not found for this user.")
 
     print("DEBUG returning user:", profile_data)
     return profile_data
 
+# NEW: Admin Delete User Endpoint
+@router.delete("/delete-user/{role}/{user_custom_id}")
+async def delete_user_by_admin(
+    role: str,
+    user_custom_id: str,
+    current_user: AdminModel = Depends(get_current_user) # Ensure only admins can call this
+):
+    """
+    Admin endpoint to delete a user by role and their custom ID.
+    Requires admin privileges.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can delete users."
+        )
 
+    try:
+        success = await admin_delete_user_by_custom_id(role, user_custom_id)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User with ID '{user_custom_id}' not found in role '{role}'."
+            )
+        return {"message": f"User '{user_custom_id}' of role '{role}' deleted successfully."}
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An error occurred: {e}")

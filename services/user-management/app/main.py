@@ -14,7 +14,8 @@ from app.anomaly_detection.workers.anomaly_detector import LoginInput, detect_lo
 # Assuming your user-management's database connection is in app/db/database.py
 from app.db.database import get_database # Import your MongoDB client
 # --- END NEW IMPORTS ---
-from app.routers import anomaly
+from app.routers import anomaly,get_recent_users
+from app.routers import user as user_router 
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -156,11 +157,15 @@ app.include_router(logout.router)
 app.include_router(add_admin.router)
 app.include_router(add_student.router)
 app.include_router(add_teacher.router)
-app.include_router(delete_user.router)  # Uncommented this
+# app.include_router(delete_user.router)  # Uncommented this
 app.include_router(admin_user_management.router)
 app.include_router(edit_profile.router)
 app.include_router(update_password.router)
 app.include_router(anomaly.router)
+app.include_router(get_recent_users.router)
+app.include_router(user_router.router) 
+
+
 
 
 

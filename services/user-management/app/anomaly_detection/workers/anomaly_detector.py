@@ -90,7 +90,9 @@ def detect_login_anomaly_logic(data: LoginInput, db_client):
     is_location_anomaly = bool(location_agent.detect(location))
     is_device_anomaly = bool(device_agent.detect(device))
 
-    is_overall_anomaly = is_time_anomaly or is_location_anomaly or is_device_anomaly
+    # is_overall_anomaly = is_time_anomaly or is_location_anomaly or is_device_anomaly
+    true_count = sum([is_time_anomaly, is_location_anomaly, is_device_anomaly])
+    is_overall_anomaly = true_count >= 2
 
     # Save the result to the database
     db_client["login_anomaly_results"].insert_one({

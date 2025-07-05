@@ -157,6 +157,26 @@ async def delete_user(role: str, user_custom_id: str, authorization: str = None)
         raise HTTPException(status_code=exc.response.status_code, detail=detail)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# NEW: Function to call the internal recent users endpoint
+async def get_recent_users_from_user_management(role: str, authorization: str = None):
+    headers = {}
+    if authorization:
+        headers["Authorization"] = authorization
+
+    url = f"{USER_MANAGEMENT_SERVICE_URL}/recent-users/{role}" # New internal path
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        detail = exc.response.json().get("detail", "User service error")
+        raise HTTPException(status_code=exc.response.status_code, detail=detail)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
     
 # --- Edit Profile ---
 async def edit_profile(role: str, user_id: str, profile_data: dict, authorization: str = None):

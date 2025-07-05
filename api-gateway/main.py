@@ -31,6 +31,7 @@ from services.usermanagement import login_user, add_admin, add_student, add_teac
 
 from schemas.usermanagement import LoginRequest, AdminCreate,StudentRegistration,TeacherCreate, UserProfileUpdate, UpdatePasswordRequest
 from services.calendar import get_assignment_deadlines
+from services.usermanagement import delete_user, get_recent_users_from_user_management # <-- THIS LINE NEEDS TO INCLUDE IT
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/user-management/login")
@@ -103,6 +104,12 @@ async def api_add_teacher(
 async def api_delete_user(role: str, user_custom_id: str, token: str = Depends(oauth2_scheme)):
     authorization = f"Bearer {token}"
     return await delete_user(role, user_custom_id, authorization)
+
+# API Gateway endpoint for recent users
+@app.get("/api/user-management/recent-users/{role}")
+async def api_get_recent_users(role: str, token: str = Depends(oauth2_scheme)): # Assuming recent users also need auth
+    authorization = f"Bearer {token}"
+    return await get_recent_users_from_user_management(role, authorization) # Call the service function
 
 @app.put("/api/user-management/edit-profile/{role}/{user_id}")
 async def api_edit_profile(

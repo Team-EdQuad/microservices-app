@@ -80,14 +80,14 @@ async def engagement_score(student_id: str, class_id: str):
 
 async def model_features(student_id: str, class_id: str):
     async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.get(f"{DASHBOARD_SERVICE_URL}/model-features/{student_id}/{class_id}/model-features")
+        response = await client.get(f"{DASHBOARD_SERVICE_URL}/ml/{student_id}/{class_id}/model-features")
         response.raise_for_status()
         return response.json()
     
 
 async def get_model_feedback(student_id: str, class_id: str):
     async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.get(f"{DASHBOARD_SERVICE_URL}/model-features/{student_id}/{class_id}/ai-feedback")
+        response = await client.get(f"{DASHBOARD_SERVICE_URL}/ml/{student_id}/{class_id}/ai-feedback")
         response.raise_for_status()
         return response.json()
 

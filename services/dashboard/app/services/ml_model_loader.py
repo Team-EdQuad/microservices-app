@@ -3,7 +3,7 @@ import shap
 
 
 def load_model():
-    with open("app/ml_models/student_performance_model.pkl", "rb") as f:
+    with open("app/ml_models/student_performance_model1.pkl", "rb") as f:
         return pickle.load(f)
 
 model = load_model()
@@ -18,7 +18,7 @@ imputer = model.named_steps['imputer']
 explainer = shap.TreeExplainer(booster)
 
 def load_exam_avg_model():
-    with open("app/ml_models/avg_exam_model.pkl", "rb") as f:
+    with open("app/ml_models/avg_exam_model1.pkl", "rb") as f:
         return pickle.load(f)
     
 avg_model = load_exam_avg_model()

@@ -26,7 +26,7 @@ async def register_student(student: StudentRegistration):
             raise HTTPException(status_code=400, detail="Student ID already exists.")
         if await collection.find_one({"email": student.email}):
             raise HTTPException(status_code=400, detail="Email already exists.")
-        if await collection.find_one({"phone_no": student.phone}):
+        if await collection.find_one({"phone_no": student.phone_no}):
             raise HTTPException(status_code=400, detail="Phone number already exists.")
 
     # Hash password (using bcrypt)

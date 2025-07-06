@@ -13,7 +13,7 @@ class StudentRegistration(BaseModel):
     # class_name: str = Field(..., min_length=1, max_length=1, pattern=r"^[A-Z]$")
     # grade: int = Field(..., ge=1, le=13)
     class_id: str
-    phone: str = Field(..., pattern=r"^\d{10}$")
+    phone_no: str = Field(..., pattern=r"^\d{10}$")
     subject: List[str]
     join_date: date
     last_edit_date: date

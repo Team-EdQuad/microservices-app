@@ -263,7 +263,7 @@ def transform_student_doc_to_model(doc: dict) -> dict:
         "password": doc.get("password", ""),
         "gender": doc.get("gender", "").lower(),
         "class_id": doc.get("class_id", ""),
-        "phone": str(doc.get("phone_no", "")),
+        "phone_no": str(doc.get("phone_no", "")),
         "subject": doc.get("subject_id", []),
         "club_id": doc.get("club_id", []),
         "sport_id": doc.get("sport_id", []),

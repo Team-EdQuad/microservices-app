@@ -22,7 +22,7 @@ rate_limiter = GeminiRateLimiter()
 
 def grade_answer(teacher_answer: str, student_answer: str) -> int:
     """Send answers to Gemini Free for grading and extract only the numerical score."""
-    
+    print("GEMINI_API_KEY in grading_gemini.py:", os.getenv("GEMINI_API_KEY"))
     # Configure Gemini with your API key
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:

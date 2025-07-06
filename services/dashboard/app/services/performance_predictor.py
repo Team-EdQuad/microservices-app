@@ -11,7 +11,7 @@ import google.generativeai as genai
 genai.configure(api_key="AIzaSyBr8ZeUFqGUT9dF4N8j-DcJk8CoctyFfq0")
 gemini_model = genai.GenerativeModel("models/gemini-2.5-pro")
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta,timezone
 from collections import defaultdict
 import pandas as pd
 import pytz
@@ -46,6 +46,7 @@ def predict_performance(features_dict: dict) -> float:
 @model_features_router.get("/{student_id}/{class_id}/model-features")
 async def get_model_features(student_id: str, class_id: str):
     try:
+        print(f"Called endpoint with student_id={student_id} class_id={class_id}") 
         student = student_table.find_one({"student_id": student_id, "class_id": class_id})
         if not student:
             raise HTTPException(status_code=404, detail="Student not found in given class")
@@ -101,8 +102,24 @@ async def get_model_features(student_id: str, class_id: str):
                         marks_count += 1
 
                     # Check late submission
-                    sub_time = datetime.fromisoformat(submission["submit_time_date"]) if isinstance(submission["submit_time_date"], str) else submission["submit_time_date"]
-                    if deadline and sub_time > deadline:
+                    # sub_time = datetime.fromisoformat(submission["submit_time_date"]) if isinstance(submission["submit_time_date"], str) else submission["submit_time_date"]
+                    # if deadline and sub_time > deadline:
+                    #     late_count += 1
+                    if isinstance(a["deadline"], str):
+                        deadline = datetime.fromisoformat(a["deadline"])
+                    else:
+                        deadline = a["deadline"]
+                    if deadline.tzinfo is None:
+                        deadline = deadline.replace(tzinfo=timezone.utc)
+
+                    if isinstance(submission["submit_time_date"], str):
+                        sub_time = datetime.fromisoformat(submission["submit_time_date"])
+                    else:
+                        sub_time = submission["submit_time_date"]
+                    if sub_time.tzinfo is None:
+                        sub_time = sub_time.replace(tzinfo=timezone.utc)
+
+                    if sub_time > deadline:
                         late_count += 1
 
             avg = (marks_total / marks_count) if marks_count else 0
@@ -215,7 +232,7 @@ async def get_model_features(student_id: str, class_id: str):
             "lms_active_avg_hrs": avg_duration_hrs,
             "resource_access_avg_hrs": resource_access_hrs
         }
-
+        
         df = pd.DataFrame([features])
         prediction = model.predict(df)[0]
         performance_score = float(prediction)
@@ -263,7 +280,7 @@ async def get_model_features(student_id: str, class_id: str):
         previous_score = previous_entry["score"] if previous_entry else None
         score_diff = float(performance_score - previous_score) if previous_score is not None else None
 
-        risk_level = determine_risk_level(prediction, score_diff)
+        risk_level = determine_risk_level(performance_score, score_diff)
 
         # === Store current prediction in collection ===
         perf_prediction_table.insert_one({

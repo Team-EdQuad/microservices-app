@@ -1,5 +1,4 @@
 from datetime import datetime
-import os
 import uuid
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
@@ -11,7 +10,6 @@ from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 import io
 import logging
 from tenacity import retry, stop_after_attempt, wait_exponential
-from pymongo.errors import PyMongoError
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -73,45 +71,6 @@ async def get_submission_file(submission_id: str):
     except Exception as e:
         logger.error(f"Error retrieving file for submission {submission_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve file: {str(e)}")
-
-
-
-# @router.get("/submission/file/{submission_id}")
-# async def serve_submission_file(submission_id: str):
-#     try:
-#         submission = db["submission"].find_one({"submission_id": submission_id})
-#         if not submission:
-#             raise HTTPException(status_code=404, detail="Submission not found")
-
-#         file_id = submission.get("content_file_id")
-#         if not file_id:
-#             raise HTTPException(status_code=404, detail="File ID not found")
-
-#         drive_service = get_drive_service()
-#         request = drive_service.files().get_media(fileId=file_id)
-#         file_io = io.BytesIO()
-#         downloader = MediaIoBaseDownload(file_io, request)
-#         done = False
-#         while not done:
-#             status, done = downloader.next_chunk()
-
-#         file_io.seek(0)
-#         file_name = submission.get("file_name", f"{submission_id}.pdf")
-        
-#         ext = os.path.splitext(file_name)[1].lower()
-#         media_type = {
-#             ".pdf": "application/pdf",
-#             ".txt": "text/plain"
-#         }.get(ext, "application/octet-stream")
-#         return StreamingResponse(
-#             content=file_io,
-#             media_type=media_type,
-#             headers={"Content-Disposition": f"inline; filename={file_name}"}
-#         )
-
-#     except Exception as e:
-#         print(f"[ERROR] Serving submission_id={submission_id} -> {str(e)}")
-#         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
 #view accessible subject and class  ( teacher )
@@ -565,6 +524,5 @@ async def review_auto_graded_marks(
     # Return the updated submission
     updated_submission = db["grading_submissions"].find_one({"submission_id": submission_id})
     return SubmissionResponse(**updated_submission)
-
 
 

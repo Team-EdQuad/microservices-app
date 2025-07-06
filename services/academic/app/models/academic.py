@@ -142,3 +142,7 @@ class StudentResponse(BaseModel):
 
 class StudentsResponse(BaseModel):
     students: List[StudentResponse]
+
+
+class StatusUpdateRequest(BaseModel):
+    student_id: str

@@ -10,6 +10,8 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 import json
+
+from pydantic import BaseModel
 # from services.attendance.app.utils import schemas as attModSchemas
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'services')))
@@ -30,7 +32,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/user-management/login")
 
 
 from services.academic import  view_auto_graded_submissions_request,review_auto_graded_marks_request,get_student_list_by_class_and_subject,get_submission_file_by_id,get_assignment_file_by_id,get_content_by_id,get_content_file_by_id,create_assignment_request,upload_content_request,view_ungraded_manual_submissions,update_manual_marks,add_exam_marks_request,get_subject_names,get_student_content,get_all_assignments,get_assignment_by_id,get_assignment_marks,get_exam_marks, upload_assignment_file ,mark_content_done,get_subject_and_class_for_teacher
-from services.behavioural import get_model_status,load_model,model_train,active_time_prediction,Visualize_data_list,time_spent_on_resources,average_active_time,resource_access_frequency,content_access_start,content_access_close
+from services.behavioural import update_collection_active_time,call_prediction_service,model_train,Visualize_data_list,time_spent_on_resources,average_active_time,resource_access_frequency,content_access_start,content_access_close
 
 from services.attendance import attendanceRouter
 
@@ -39,16 +41,6 @@ app = FastAPI(title="Microservices API Gateway")
 # app.include_router(attendanceRouter)
 
 
-
-
-# app.add_middleware(
-#     CORSMiddleware,
-#     # allow_origins=["*"],  # Frontend URL
-#     allow_origins=["http://localhost:5173"],  # Frontend URL
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
 
 app.add_middleware(
     CORSMiddleware,
@@ -154,7 +146,6 @@ async def get_content_file(assignment_id: str):
     return await get_assignment_file_by_id(assignment_id)
 
 
-
 @app.get("/api/subject/{student_id}", response_model=List)
 async def get_subjects(student_id: str):
     return await get_subject_names(student_id)
@@ -200,19 +191,15 @@ async def submit_assignment_file(
     file: UploadFile = File(...)
 ):
     return await upload_assignment_file(student_id, assignment_id, file)
-    
+
+class StatusUpdateRequest(BaseModel):
+    student_id: str
 
 @app.post("/api/content/{content_id}")
-async def mark_content_completed(content_id: str):
-    success = await mark_content_done(content_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Content not found or not accessible")
-    return {"message": "Content marked as completed"}
-
-
+async def mark_content_completed(content_id: str, payload: StatusUpdateRequest):
+    return await mark_content_done(content_id, payload.student_id)
 
 ###teacher 
-
 
 @app.get("/api/studentlist/{class_id}/{subject_id}")
 async def get_student_list(class_id: str, subject_id: str):
@@ -222,8 +209,6 @@ async def get_student_list(class_id: str, subject_id: str):
 @app.get("/api/submission/file/{submission_id}")
 async def get_submission_file(submission_id: str):
     return await get_submission_file_by_id(submission_id)
-
-
 
 
 @app.get("/api/subjectNclass/{teacher_id}")
@@ -350,43 +335,40 @@ async def close_content_access(
     return await content_access_close(student_id, content_id)
 
 
-
 # 1. Visualization endpoint
 @app.get("/api/visualize_data/{subject_id}/{class_id}")
 async def Visualize(subject_id: str, class_id: str):
    return await Visualize_data_list(subject_id, class_id)
 
 
+class PredictionInput(BaseModel):
+    SpecialEventThisWeek: int
+    ResourcesUploadedThisWeek: int
 
 # 2. Prediction endpoint (POST with JSON body)
-@app.post("/api/predict_active_time/")
-async def Prediction(
-    Weeknumber: int = Form(...),
-    SpecialEventThisWeek: int = Form(...),
-    ResourcesUploadedThisWeek: int = Form(...)
+@app.post("/api/predict_active_time/{subject_id}/{class_id}")
+async def gateway_prediction_endpoint(
+    subject_id: str,
+    class_id: str,
+    input_data: PredictionInput # Use the Pydantic model instead of Form data
 ):
-    input_data = {
-        "Weeknumber": Weeknumber,
-        "SpecialEventThisWeek": SpecialEventThisWeek,
-        "ResourcesUploadedThisWeek": ResourcesUploadedThisWeek
-    }
-    return await active_time_prediction(input_data)
+    
+    return await call_prediction_service(subject_id, class_id, input_data)
+    
 
 
 # 3. Train model
-@app.post("/api/train_model/")
-async def TrainModel():
-    return await model_train()
+@app.post("/api/train/{subject_id}/{class_id}")
+async def TrainModel(subject_id: str, class_id: str):
+    return await model_train(subject_id, class_id)
 
-# 4. Load model
-@app.post("/api/load_model/")
-async def LoadModel():
-    return await load_model()
 
-# 5. Get model status
-@app.get("/api/model_status/")
-async def ModelStatus():
-    return await get_model_status()
+
+@app.post("/api/update_collection/{subject_id}/{class_id}")
+async def Update(subject_id: str, class_id: str):
+    return await update_collection_active_time(subject_id, class_id)
+
+
 
 
 

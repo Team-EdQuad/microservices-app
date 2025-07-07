@@ -26,7 +26,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, APIRouter, Body, UploadFile, File, Form
 from services.nonacademic import get_all_sports, create_sport, get_all_clubs, create_club, filter_sports
 from services.dashboard import get_student_progress, get_student_assignments,filter_assignments,sort_assignments, get_student_attendance,get_student_exam_marks,monthly_attendance, current_weekly_attendance,non_academic_attendance,engagement_score, model_features,get_model_feedback
-from services.dashboard import get_teacher_assignments, get_exam_marks_teacher, get_student_progress_teacher, get_weekly_attendance,get_all_Classes
+from services.dashboard import get_teacher_assignments, get_exam_marks_teacher, get_student_progress_teacher, get_weekly_attendance,get_all_Classes,get_low_attendance_students,get_low_attendance_students_count
 from services.dashboard import get_exam_marks_admin,  get_student_progress_admin, get_weekly_attendance_admin, get_stats, get_all_users
 
 from services.usermanagement import login_user, add_admin, add_student, add_teacher, delete_user,edit_profile, update_password, get_profile, serialize_dates,logout_user,fetch_anomaly_results
@@ -570,6 +570,19 @@ async def weekly_attendance(class_id: str = "CLS001", year: int = datetime.now()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/teacher/dashboard/low-academic-attendance")
+async def low_academic_attendance(threshold: float = 80.0):
+    try:
+        return await get_low_attendance_students(threshold)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) 
+    
+@app.get("/api/teacher/dashboard/low-attendance-count")
+async def low_attendance_count():
+    try:
+        return await get_low_attendance_students_count()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 #Admin Dashboard Routes
 @app.get("/api/admin/dashboard/users")
 async def users(search_with_id: str = None, role: str = None, class_id: str = None):

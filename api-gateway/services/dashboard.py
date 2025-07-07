@@ -131,6 +131,26 @@ async def get_weekly_attendance(class_id: str, year: int, week_num: int):
         )
         response.raise_for_status()
         return response.json()
+    
+async def get_low_attendance_students(threshold: float = 80.0):
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{DASHBOARD_SERVICE_URL}/teacher/low-academic-attendance",
+                                        params={"threshold": threshold})
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=e.response.status_code, detail=str(e))
+    
+async def get_low_attendance_students_count():
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{DASHBOARD_SERVICE_URL}/teacher/low-attendance-count")
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=e.response.status_code, detail=str(e))
+    
 #-----------------End of Teacher Dashboard Routes------------------
 
 #-----------------Admin Dashboard Routes------------------

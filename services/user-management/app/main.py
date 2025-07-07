@@ -188,17 +188,11 @@ async def detect_login_anomaly_api(
         # Trigger anomaly detection logic
         result = detect_login_anomaly_logic(data=data, db_client=db_client)
 
-        # Trigger retraining in the background to avoid blocking the API response
-        # NOTE: Frequent retraining can be very resource-intensive.
-        # Consider a separate background worker or scheduled task for this in production.
-        # BackgroundTasks are good for fire-and-forget, but won't handle failures.
-        # background_tasks.add_task(retrain_models, db_client) # Uncomment if you want background retraining
-
         return result
     except Exception as e:
         logger.error(f"Error during anomaly detection: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error during anomaly detection process")
-# --- END NEW ANOMALY DETECTION ENDPOINT ---
+# --- END ANOMALY DETECTION ENDPOINT ---
 
 # Health check endpoint
 @app.get("/health")

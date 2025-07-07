@@ -332,45 +332,50 @@ async def get_assignment(assignment_id: str):
         raise HTTPException(status_code=500, detail="Error processing assignment data")
 
 
-#view assignment marks
+# View assignment marks from both submission and grading_submission
 @router.get("/submissionmarks/{student_id}", response_model=List[AssignmentMarksResponse])
 async def get_submission_marks(student_id: str):
-    # Step 1: Fetch all submissions for this student
-    submissions_cursor = db["submission"].find({"student_id": student_id}, {"_id": 0})
+    # Step 1: Fetch submissions from both collections
+    submission_cursor = db["submission"].find({"student_id": student_id}, {"_id": 0})
+    grading_cursor = db["grading_submissions"].find({"student_id": student_id}, {"_id": 0})
     
-    # Convert cursor to list
-    submission_list = list(submissions_cursor)
+    submission_list = list(submission_cursor)
+    grading_list = list(grading_cursor)
     
-    if not submission_list:
+    # Combine both lists
+    combined_submissions = submission_list + grading_list
+
+    if not combined_submissions:
         raise HTTPException(status_code=404, detail="No submissions found for this student")
     
-    print(f"Found {len(submission_list)} submissions for student {student_id}")
+    print(f"Found {len(combined_submissions)} total submissions for student {student_id}")
     
-    # Map database fields to Pydantic model fields
+    # Prepare response
     submissions_responses = []
-    for submission in submission_list:
+    for submission in combined_submissions:
         assignment_id = submission.get("assignment_id")
-        assignment_name = None
-        if assignment_id:
+        assignment_name = submission.get("assignment_name")
+        if not assignment_name and assignment_id:
+            # Fallback: get from assignment collection
             assignment_doc = db["assignment"].find_one({"assignment_id": assignment_id}, {"_id": 0, "assignment_name": 1})
             if assignment_doc:
                 assignment_name = assignment_doc.get("assignment_name")
-        
-        # Get subject name from subject collection
+
         subject_id = submission.get("subject_id")
-        subject_name = None
-        if subject_id:
+        subject_name = submission.get("subject_name")
+        if not subject_name and subject_id:
+            # Fallback: get from subject collection
             subject_doc = db["subject"].find_one({"subject_id": subject_id}, {"_id": 0, "subject_name": 1})
             if subject_doc:
                 subject_name = subject_doc.get("subject_name")
 
         submissions_responses.append(AssignmentMarksResponse(
             teacher_id=submission.get("teacher_id"),
-            subject_id=submission.get("subject_id"),
-            assignment_id=submission.get("assignment_id"),
+            subject_id=subject_id,
+            assignment_id=assignment_id,
             assignment_name=assignment_name,
             subject_name=subject_name,
-            marks=submission.get("marks", 0)  # Default to 0 if marks not found
+            marks=submission.get("marks", 0)
         ))
     
     return submissions_responses
@@ -516,8 +521,6 @@ async def submit_assignment(student_id: str, assignment_id: str, file: UploadFil
     except Exception as e:
         logger.error(f"[ERROR] Submitting submission_id={submission_id} -> {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to submit assignment: {str(e)}")
-
-
 
 
 # update content status (mark as done)

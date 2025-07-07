@@ -31,4 +31,3 @@ async def delete_user(
 
     message = await delete_user_account(request.username, request.password)
     return {"message": message}
-

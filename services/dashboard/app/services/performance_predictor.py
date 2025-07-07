@@ -18,6 +18,12 @@ import pytz
 
 model_features_router = APIRouter()
 
+def predict_performance(features_dict: dict) -> float:
+    df = pd.DataFrame([features_dict])
+    prediction = model.predict(df)[0]
+    return round(float(prediction), 2)
+
+
 def determine_risk_level(current_score, score_diff):
     if score_diff is None:  # No previous score exists
         if current_score >= 75:
@@ -38,10 +44,6 @@ def determine_risk_level(current_score, score_diff):
         else:
             return "High Risk"
 
-def predict_performance(features_dict: dict) -> float:
-    df = pd.DataFrame([features_dict])
-    prediction = model.predict(df)[0]
-    return round(float(prediction), 2)
 
 @model_features_router.get("/{student_id}/{class_id}/model-features")
 async def get_model_features(student_id: str, class_id: str):

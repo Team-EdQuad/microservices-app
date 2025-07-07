@@ -9,6 +9,14 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from jose import jwt
 import logging
 
+# --- NEW IMPORTS FOR ANOMALY DETECTION ---
+from app.anomaly_detection.workers.anomaly_detector import LoginInput, detect_login_anomaly_logic, retrain_models
+# Assuming your user-management's database connection is in app/db/database.py
+from app.db.database import get_database # Import your MongoDB client
+# --- END NEW IMPORTS ---
+from app.routers import anomaly,get_recent_users
+from app.routers import user as user_router 
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -149,10 +157,42 @@ app.include_router(logout.router)
 app.include_router(add_admin.router)
 app.include_router(add_student.router)
 app.include_router(add_teacher.router)
-app.include_router(delete_user.router)  # Uncommented this
+# app.include_router(delete_user.router)  # Uncommented this
 app.include_router(admin_user_management.router)
 app.include_router(edit_profile.router)
 app.include_router(update_password.router)
+app.include_router(anomaly.router)
+app.include_router(get_recent_users.router)
+app.include_router(user_router.router) 
+
+
+
+
+
+# --- NEW ANOMALY DETECTION ENDPOINT ---
+@app.post("/anomaly-detection/detect-login-anomaly")
+async def detect_login_anomaly_api(
+    data: LoginInput,
+    # This endpoint can be called by anyone as part of login flow, or by admin
+    # current_user=Depends(get_current_user) # Uncomment if only authenticated users can trigger
+):
+    """
+    Endpoint to detect login anomalies based on provided input data.
+    This will save login attempts and anomaly results to MongoDB
+    and trigger model retraining.
+    """
+    try:
+        # Get the MongoDB database client
+        db_client = get_database() # Assuming get_database_client returns the 'db' object
+
+        # Trigger anomaly detection logic
+        result = detect_login_anomaly_logic(data=data, db_client=db_client)
+
+        return result
+    except Exception as e:
+        logger.error(f"Error during anomaly detection: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Error during anomaly detection process")
+# --- END ANOMALY DETECTION ENDPOINT ---
 
 # Health check endpoint
 @app.get("/health")
@@ -163,7 +203,7 @@ async def health_check():
 # Profile endpoint with enhanced error handling
 @app.get("/profile")
 async def get_profile(current_user=Depends(get_current_user)):
-    """Get user profile with enhanced error handling"""
+    """Get full user profile with normalized user_id and full_name"""
     try:
         role = current_user.role.lower()
 
@@ -172,7 +212,7 @@ async def get_profile(current_user=Depends(get_current_user)):
             "teacher": "teacher_id",
             "student": "student_id"
         }
-        
+
         id_field = id_field_map.get(role)
         if not id_field:
             raise HTTPException(status_code=400, detail="Invalid user role")
@@ -181,23 +221,22 @@ async def get_profile(current_user=Depends(get_current_user)):
         if user_id is None:
             raise HTTPException(status_code=404, detail="User ID not found")
 
+        # Fix full_name if missing or invalid
         full_name = getattr(current_user, "full_name", "").strip()
         if not full_name or full_name.lower() == "string":
             first = getattr(current_user, "first_name", "").strip()
             last = getattr(current_user, "last_name", "").strip()
             full_name = f"{first} {last}".strip()
-            
-        profile_data = {
-            "user_id": user_id,
-            "role": current_user.role,
-            "full_name": full_name,
-        }
-        
-        if role == "student":
-            profile_data["class_id"] = getattr(current_user, "class_id", None)
 
-        return profile_data
-        
+        # Convert the full model to dict
+        user_dict = current_user.dict()
+
+        # Override normalized fields
+        user_dict["user_id"] = user_id
+        user_dict["full_name"] = full_name
+
+        return user_dict
+
     except HTTPException:
         raise
     except Exception as e:

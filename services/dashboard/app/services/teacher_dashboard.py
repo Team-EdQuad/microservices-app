@@ -6,62 +6,11 @@ from ..models.teacher_dashboard import ExamMarksResponse, StudentProgress
 from bson.objectid import ObjectId
 from typing import List
 from datetime import datetime, timedelta
+from collections import defaultdict
+
 
 teacher_dashboard_router = APIRouter()
 
-# @teacher_dashboard_router.get("/{teacher_id}/assignments", response_model=List[dict])
-# async def get_uploaded_assignments(teacher_id: str):
-#     try:
-#         teacher = teacher_table.find_one({"teacher_id": teacher_id})
-
-#         if not teacher:
-#             raise HTTPException(status_code=404, detail=f"Teacher with ID {teacher_id} not found")
-        
-#         teacher_subjects = teacher.get("subject_id" ,[])
-#         teacher_classes = teacher.get("class_id" , [])
-     
-#         if not teacher_subjects :
-#             raise HTTPException(status_code=404, detail=f"No subjects found for Teacher with ID {teacher_id}")
-        
-#         assignment_timeline = []
-        
-
-#         for subject_id in teacher_subjects:
-#             subject = subject_table.find_one({"subject_id": subject_id})
-#             if not subject:
-#                 continue 
-            
-#             for class_id in teacher_classes:
-#                 class_details = class_table.find_one({"class_id": class_id})
-#                 if not class_details:
-#                     continue
-                
-#                 class_name = class_details.get("class_name")
-#                 total_students = student_table.count_documents({"class_id": class_id})
-
-#                 assignments = assignment_table.find({"subject_id":subject_id, "class_id": class_id, "teacher_id" : teacher_id})
-
-#                 for assignment in assignments:
-#                     deadline = assignment.get("deadline")
-#                     if isinstance(deadline, str):
-#                         deadline = datetime.fromisoformat(deadline)
-                    
-#                     submission_count = submission_table.count_documents({"assignment_id" : assignment["assignment_id"]})
-
-#                     assignment_timeline.append({
-#                     "assignment_name": assignment["assignment_name"],
-#                     "subject_name": subject["subject_name"],
-#                     "class_name": class_name,
-#                     "deadline": deadline if deadline else None,
-#                     "submission_count" : submission_count,
-#                     "total_students" : total_students
-                    
-#                     })
-            
-#         return all_uploaded_assignments(assignment_timeline)
-
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Error retrieving teacher assignments: {str(e)}")
 @teacher_dashboard_router.get("/{teacher_id}/assignments", response_model=List[dict])
 async def get_uploaded_assignments(teacher_id: str):
     try:
@@ -185,123 +134,6 @@ async def get_class_exam_marks(class_id: str, exam_year: int):
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving class exam marks: {str(e)}")
-
-
-# @teacher_dashboard_router.get("/{class_id}/student_progress", response_model=List[dict])
-# async def get_student_progress(class_id: str, year: int = None):
-#     try:
-#         if not year:
-#             year = datetime.now().year
-        
-#         class_details = class_table.find_one({"class_id": class_id})
-#         class_name = class_details.get("class_name")
-#         all_students = list(student_table.find({"class_id": class_id}))
-#         academic_attendance = list(academic_attendance_table.find({"class_id": class_id}))
-
-#         if not all_students:
-#             raise HTTPException(status_code=404, detail="No students found in this class")
-
-#         student_progress = []
-
-    
-
-#         for student in all_students:
-#             student["first_term_avg"] = 0
-#             student["second_term_avg"] = 0
-#             student["third_term_avg"] = 0
-#             total_days = 0
-#             present_days = 0
-#             student["academic_attendance_rate"] = 0
-#             student["non_academic_attendance_rate"] = 0
-#             student["avg_academic_progress"] = 0
-
-
-#             student["name"] = student.get("full_name", "Unknown")
-#             student_id = student["student_id"]
-#             student_exam_marks = exam_table.find_one({"student_id": student_id, "class_id": class_id, "exam_year": year})
-
-#             if not student_exam_marks:
-#                 continue  # Skip if no exam data
-
-#             num_subjects = len(student_exam_marks["exam_marks"]) or 1
-
-#             for subject in student_exam_marks.get("exam_marks", []):
-#                 for exam in subject["exams"]:
-#                     term = exam["term"]
-#                     marks = exam["marks"]
-
-#                     if term == 1:
-#                         student["first_term_avg"] += marks
-#                     elif term == 2:
-#                         student["second_term_avg"] += marks
-#                     elif term == 3:
-#                         student["third_term_avg"] += marks
-
-#             student["first_term_avg"] /= num_subjects
-#             student["second_term_avg"] /= num_subjects
-#             student["third_term_avg"] /= num_subjects
-
-#             for record in academic_attendance:
-#                 record_date = datetime.strptime(record["date"], "%Y-%m-%d")
-#                 if record_date.year == year:
-#                     total_days += 1
-                    
-#                     for attendance_status in record["status"]:
-#                         if attendance_status["student_id"] == student_id:
-#                             if attendance_status["status"]:
-#                                 present_days += 1
-#                             break
-
-#             if total_days == 0:
-#                 raise HTTPException(status_code=404, detail=f"No attendance records found for student ")
-
-#             attendance_rate = (present_days / total_days) * 100 if total_days > 0 else 0
-
-
-#             student_subjects = student.get("subject_id" ,[])
-     
-#             if not student_subjects:
-#                 raise HTTPException(status_code=404, detail=f"No subjects found for Student with ID {student_id}")
-#             progress_rate = 0
-#             for subject_id in student_subjects:
-#                 completed_contents = 0
-#                 subject = subject_table.find_one({"subject_id": subject_id})
-
-#                 if not subject:
-#                     raise HTTPException(status_code=404, detail=f"Subject with ID {subject_id} not found")
-                
-#                 total_contents = content_table.count_documents({"subject_id": subject_id, "class_id": class_id, "Date": {"$regex": f"^{year}-" }})
-#                 if total_contents == 0:
-#                     continue
-
-#                 contents = list(content_table.find({"subject_id": subject_id, "class_id": class_id, "Date": {"$regex": f"^{year}-" }}))
-#                 for content in contents:
-#                     content_id = content.get("content_id")
-
-#                     student_content = student_content_table.find_one({"content_id": content_id, "student_id": student_id, "status": "Active", "class_id": class_id})
-#                     if student_content:
-#                         completed_contents += 1
-
-#                 progress_percentage = (completed_contents / total_contents) * 100 if total_contents > 0 else 0
-#                 progress_rate += progress_percentage
-
-#             student["avg_academic_progress"] = progress_rate / len(student_subjects)
-
-
-#             student_progress.append({
-#                 "student_name": student["name"],
-#                 "first_term_avg": round(student["first_term_avg"], 2),
-#                 "second_term_avg": round(student["second_term_avg"],2),
-#                 "third_term_avg": round(student["third_term_avg"], 2),
-#                 "academic_attendance_rate": round(attendance_rate, 2),
-#                 "non_academic_attendance_rate": round(student["non_academic_attendance_rate"], 2),
-#                 "avg_academic_progress": round(student["avg_academic_progress"], 2)
-#             })
-
-#         return all_progress(student_progress) if student_progress else []
-
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Error retrieving student progress: {str(e)}")
 
 @teacher_dashboard_router.get("/{class_id}/student_progress", response_model=List[dict])
 async def get_student_progress(class_id: str, year: int = None):
@@ -480,6 +312,102 @@ async def get_weekly_attendance(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving attendance data: {str(e)}")
+    
+@teacher_dashboard_router.get("/low-academic-attendance", response_model=List[dict])
+async def get_low_attendance_students(threshold: float = 80.0):
+    try:
+        students = list(student_table.find({}))
+        if not students:
+            raise HTTPException(status_code=404, detail="No students found.")
+
+        attendance_records = list(academic_attendance_table.find({"subject_id": "academic"}))
+        if not attendance_records:
+            raise HTTPException(status_code=404, detail="No academic attendance records found.")
+
+        # Map: student_id -> {class_id, full_name, total_days, present_days}
+        attendance_summary = defaultdict(lambda: {"class_id": "", "full_name": "", "total": 0, "present": 0})
+
+        for record in attendance_records:
+            date = datetime.strptime(record["date"], "%Y-%m-%d")
+            if date.year != datetime.now().year:
+                continue
+
+            for student_id, status in record.get("status", {}).items():
+                attendance_summary[student_id]["total"] += 1
+                if status == "present":
+                    attendance_summary[student_id]["present"] += 1
+
+        low_attendance_list = []
+
+        for student in students:
+            sid = student["student_id"]
+            if sid not in attendance_summary:
+                continue  # No attendance data
+
+            summary = attendance_summary[sid]
+            summary["class_id"] = student.get("class_id", "")
+            summary["full_name"] = student.get("full_name", f"{student.get('first_name', '')} {student.get('last_name', '')}".strip())
+
+            total = summary["total"]
+            present = summary["present"]
+            attendance_pct = (present / total) * 100 if total > 0 else 0
+
+            if attendance_pct < threshold:
+                low_attendance_list.append({
+                    "student_id": sid,
+                    "full_name": summary["full_name"],
+                    "class_id": summary["class_id"],
+                    "attendance_rate": round(attendance_pct, 2)
+                })
+
+        return low_attendance_list
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving low attendance students: {str(e)}")
+    
+@teacher_dashboard_router.get("/low-attendance-count")
+def get_low_attendance_student_count(threshold: float = 80.0):
+    try:
+        students = list(student_table.find({}))
+        if not students:
+            raise HTTPException(status_code=404, detail="No students found.")
+
+        attendance_records = list(academic_attendance_table.find({"subject_id": "academic"}))
+        if not attendance_records:
+            raise HTTPException(status_code=404, detail="No academic attendance records found.")
+
+        attendance_summary = defaultdict(lambda: {"total": 0, "present": 0})
+        current_year = datetime.now().year
+
+        for record in attendance_records:
+            date = datetime.strptime(record["date"], "%Y-%m-%d")
+            if date.year != current_year:
+                continue
+
+            for student_id, status in record.get("status", {}).items():
+                attendance_summary[student_id]["total"] += 1
+                if status == "present":
+                    attendance_summary[student_id]["present"] += 1
+
+        count = 0
+        for student in students:
+            sid = student["student_id"]
+            if sid not in attendance_summary:
+                continue
+
+            total = attendance_summary[sid]["total"]
+            present = attendance_summary[sid]["present"]
+            attendance_rate = (present / total) * 100 if total > 0 else 0
+
+            if attendance_rate < threshold:
+                count += 1
+
+        return {"low_attendance_student_count": count}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+
 
 
 

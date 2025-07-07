@@ -254,19 +254,32 @@ async def upload_assignment_file(student_id: str, assignment_id: str, file: Uplo
         print(f"Unexpected error: {type(exc).__name__}: {str(exc)}")
         raise HTTPException(status_code=500, detail=f"Submission failed: {str(exc)}")
 
-
-async def mark_content_done(content_id: str):
+async def mark_content_done(content_id: str, student_id: str): # Now accepts student_id
     try:
         async with httpx.AsyncClient() as client:
+            # The URL for the academic service endpoint
             url = f"{ACADEMIC_SERVICE_URL}/content/{content_id}"
-            response = await client.post(url)
-            response.raise_for_status()
+            
+            # The JSON payload to send
+            json_payload = {"student_id": student_id}
+            
+            # --- THIS IS THE KEY CHANGE ---
+            # Add the `json` parameter to your post request
+            response = await client.post(url, json=json_payload)
+            
+            response.raise_for_status() # This will raise an error for 4xx or 5xx responses
             return response.json()
+            
     except httpx.HTTPStatusError as exc:
-        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+        # Re-raise the error from the downstream service with its details
+        raise HTTPException(status_code=exc.response.status_code, detail=exc.response.json())
+    except httpx.RequestError as exc:
+        # Handle connection errors to the academic service
+        raise HTTPException(status_code=503, detail=f"Service unavailable: {exc}")
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to update content status: {str(exc)}")
-    
+        # Catch any other unexpected errors
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(exc)}")
+
 
 ###teacher 
 async def get_subject_and_class_for_teacher(teacher_id: str):

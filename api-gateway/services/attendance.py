@@ -362,3 +362,4 @@ async def forward_get_all_nonacadamic_subjects():
             status_code=500,
             content={"detail": f"Gateway error: {str(e)}"}
         )
+

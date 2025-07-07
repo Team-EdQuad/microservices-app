@@ -1,3 +1,4 @@
-.env
+
 venv/*
 /uploads/*
+!services/academic/app/.env

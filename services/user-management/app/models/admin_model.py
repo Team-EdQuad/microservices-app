@@ -14,7 +14,7 @@ class AdminModel(BaseModel):
     password: str  # Raw password, will be hashed during creation
     role: str  # Role can be admin, student, teacher, etc.
     join_date: Optional[Union[date, datetime]] = None
-    last_edit: Optional[Union[date, datetime]] = None
+    last_edit_date: Optional[Union[date, datetime]] = None
     gender: str
 
 # class AdminCreate(BaseModel):

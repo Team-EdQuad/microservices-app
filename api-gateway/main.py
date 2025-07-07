@@ -3,13 +3,21 @@ import os
 from datetime import datetime, timedelta
 import httpx 
 from fastapi.responses import JSONResponse
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from fastapi import Depends,Request,Body,Form
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles 
+from fastapi import Query
+from datetime import date
+
+
 
 import json
+
+from pydantic import BaseModel
 # from services.attendance.app.utils import schemas as attModSchemas
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'services')))
@@ -18,37 +26,34 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, APIRouter, Body, UploadFile, File, Form
 from services.nonacademic import get_all_sports, create_sport, get_all_clubs, create_club, filter_sports
 from services.dashboard import get_student_progress, get_student_assignments,filter_assignments,sort_assignments, get_student_attendance,get_student_exam_marks,monthly_attendance, current_weekly_attendance,non_academic_attendance,engagement_score, model_features,get_model_feedback
-from services.dashboard import get_teacher_assignments, get_exam_marks_teacher, get_student_progress_teacher, get_weekly_attendance,get_all_Classes
+from services.dashboard import get_teacher_assignments, get_exam_marks_teacher, get_student_progress_teacher, get_weekly_attendance,get_all_Classes,get_low_attendance_students,get_low_attendance_students_count
 from services.dashboard import get_exam_marks_admin,  get_student_progress_admin, get_weekly_attendance_admin, get_stats, get_all_users
 
-from services.usermanagement import login_user, add_admin, add_student, add_teacher, delete_user,edit_profile, update_password, get_profile, serialize_dates,logout_user
+from services.usermanagement import login_user, add_admin, add_student, add_teacher, delete_user,edit_profile, update_password, get_profile, serialize_dates,logout_user,fetch_anomaly_results
 
 from schemas.usermanagement import LoginRequest, AdminCreate,StudentRegistration,TeacherCreate, UserProfileUpdate, UpdatePasswordRequest
+from services.calendar import get_assignment_deadlines
+from services.usermanagement import delete_user, get_recent_users_from_user_management # <-- THIS LINE NEEDS TO INCLUDE IT
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/user-management/login")
 
 
 from services.academic import  view_auto_graded_submissions_request,review_auto_graded_marks_request,get_student_list_by_class_and_subject,get_submission_file_by_id,get_assignment_file_by_id,get_content_by_id,get_content_file_by_id,create_assignment_request,upload_content_request,view_ungraded_manual_submissions,update_manual_marks,add_exam_marks_request,get_subject_names,get_student_content,get_all_assignments,get_assignment_by_id,get_assignment_marks,get_exam_marks, upload_assignment_file ,mark_content_done,get_subject_and_class_for_teacher
-from services.behavioural import get_model_status,load_model,model_train,active_time_prediction,Visualize_data_list,time_spent_on_resources,average_active_time,resource_access_frequency,content_access_start,content_access_close
+from services.behavioural import update_collection_active_time,call_prediction_service,model_train,Visualize_data_list,time_spent_on_resources,average_active_time,resource_access_frequency,content_access_start,content_access_close
 
 from services.attendance import attendanceRouter
 
+
 app = FastAPI(title="Microservices API Gateway") 
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # app.include_router(attendanceRouter)
 
 
 
 
-# app.add_middleware(
-#     CORSMiddleware,
-#     # allow_origins=["*"],  # Frontend URL
-#     allow_origins=["http://localhost:5173"],  # Frontend URL
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
 
 app.add_middleware(
     CORSMiddleware,
@@ -106,6 +111,12 @@ async def api_delete_user(role: str, user_custom_id: str, token: str = Depends(o
     authorization = f"Bearer {token}"
     return await delete_user(role, user_custom_id, authorization)
 
+# API Gateway endpoint for recent users
+@app.get("/api/user-management/recent-users/{role}")
+async def api_get_recent_users(role: str, token: str = Depends(oauth2_scheme)): # Assuming recent users also need auth
+    authorization = f"Bearer {token}"
+    return await get_recent_users_from_user_management(role, authorization) # Call the service function
+
 @app.put("/api/user-management/edit-profile/{role}/{user_id}")
 async def api_edit_profile(
     role: str,
@@ -133,6 +144,63 @@ async def profile(token: str = Depends(oauth2_scheme)):
     print(f"Profile data response: {profile_data}")
     return profile_data
 
+@app.get("/api/anomaly-detection/results")
+async def api_get_anomaly_results(
+    username: Optional[str] = Query(None),
+    role: Optional[str] = Query(None),
+    token: str = Depends(oauth2_scheme)
+):
+    # authorization = f"Bearer {token}"
+    from services.usermanagement import fetch_anomaly_results
+    return await fetch_anomaly_results(username, role, token)
+
+# MODIFIED ANOMALY DETECTION RESULTS ENDPOINT IN API GATEWAY
+# @app.get("/api/anomaly-detection/results")
+# async def api_get_anomaly_results(
+#     request: Request, # <-- Inject Request object to manually get header
+#     username: str = Query(...),
+#     role: str = Query(...)
+#     # Removed token: str = Depends(oauth2_scheme) here
+# ):
+#     # Get Authorization header directly from the request
+#     authorization_header = request.headers.get("Authorization")
+#     if not authorization_header:
+#         raise HTTPException(status_code=401, detail="Authorization header missing")
+
+#     # Extract token string (remove "Bearer ")
+#     if not authorization_header.startswith("Bearer "):
+#         raise HTTPException(status_code=401, detail="Invalid Authorization header format. Must be 'Bearer <token>'")
+#     token_string = authorization_header.replace("Bearer ", "")
+
+#     if not token_string:
+#         raise HTTPException(status_code=401, detail="Bearer token missing after 'Bearer ' prefix")
+
+#     # Pass the raw token string to the service function
+#     return await fetch_anomaly_results(username, role, token_string)
+
+# NEW CALENDAR ENDPOINT
+@app.get("/api/calendar/assignments/deadlines", response_model=List[Dict[str, Any]])
+async def api_get_assignment_deadlines(
+    student_id: Optional[str] = Query(None),
+    class_id: Optional[str] = Query(None),
+    subject_id: Optional[str] = Query(None),
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    token: str = Depends(oauth2_scheme) # Assuming authentication is required
+) -> List[Dict[str, Any]]:
+    """
+    API Gateway endpoint to fetch assignment deadlines from the Calendar microservice.
+    """
+    authorization = f"Bearer {token}"
+    return await get_assignment_deadlines(
+        student_id=student_id,
+        class_id=class_id,
+        subject_id=subject_id,
+        start_date=start_date,
+        end_date=end_date,
+        authorization=authorization
+    )
+
 
 #non-academic
 @app.get("/api/nonacademic/sports", response_model=list)
@@ -156,7 +224,6 @@ async def get_content_file(content_id: str):
 @app.get("/api/assignment/file/{assignment_id}")
 async def get_content_file(assignment_id: str):
     return await get_assignment_file_by_id(assignment_id)
-
 
 
 @app.get("/api/subject/{student_id}", response_model=List)
@@ -195,8 +262,6 @@ async def fetch_assignment_marks(student_id: str):
 async def fetch_exam_marks(student_id: str):
     return await get_exam_marks(student_id)
     
-
-
 @app.post("/api/submission/{student_id}/{assignment_id}")
 async def submit_assignment_file(
     student_id: str,
@@ -204,19 +269,15 @@ async def submit_assignment_file(
     file: UploadFile = File(...)
 ):
     return await upload_assignment_file(student_id, assignment_id, file)
-    
+
+class StatusUpdateRequest(BaseModel):
+    student_id: str
 
 @app.post("/api/content/{content_id}")
-async def mark_content_completed(content_id: str):
-    success = await mark_content_done(content_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Content not found or not accessible")
-    return {"message": "Content marked as completed"}
-
-
+async def mark_content_completed(content_id: str, payload: StatusUpdateRequest):
+    return await mark_content_done(content_id, payload.student_id)
 
 ###teacher 
-
 
 @app.get("/api/studentlist/{class_id}/{subject_id}")
 async def get_student_list(class_id: str, subject_id: str):
@@ -226,8 +287,6 @@ async def get_student_list(class_id: str, subject_id: str):
 @app.get("/api/submission/file/{submission_id}")
 async def get_submission_file(submission_id: str):
     return await get_submission_file_by_id(submission_id)
-
-
 
 
 @app.get("/api/subjectNclass/{teacher_id}")
@@ -354,43 +413,40 @@ async def close_content_access(
     return await content_access_close(student_id, content_id)
 
 
-
 # 1. Visualization endpoint
 @app.get("/api/visualize_data/{subject_id}/{class_id}")
 async def Visualize(subject_id: str, class_id: str):
    return await Visualize_data_list(subject_id, class_id)
 
 
+class PredictionInput(BaseModel):
+    SpecialEventThisWeek: int
+    ResourcesUploadedThisWeek: int
 
 # 2. Prediction endpoint (POST with JSON body)
-@app.post("/api/predict_active_time/")
-async def Prediction(
-    Weeknumber: int = Form(...),
-    SpecialEventThisWeek: int = Form(...),
-    ResourcesUploadedThisWeek: int = Form(...)
+@app.post("/api/predict_active_time/{subject_id}/{class_id}")
+async def gateway_prediction_endpoint(
+    subject_id: str,
+    class_id: str,
+    input_data: PredictionInput # Use the Pydantic model instead of Form data
 ):
-    input_data = {
-        "Weeknumber": Weeknumber,
-        "SpecialEventThisWeek": SpecialEventThisWeek,
-        "ResourcesUploadedThisWeek": ResourcesUploadedThisWeek
-    }
-    return await active_time_prediction(input_data)
+    
+    return await call_prediction_service(subject_id, class_id, input_data)
+    
 
 
 # 3. Train model
-@app.post("/api/train_model/")
-async def TrainModel():
-    return await model_train()
+@app.post("/api/train/{subject_id}/{class_id}")
+async def TrainModel(subject_id: str, class_id: str):
+    return await model_train(subject_id, class_id)
 
-# 4. Load model
-@app.post("/api/load_model/")
-async def LoadModel():
-    return await load_model()
 
-# 5. Get model status
-@app.get("/api/model_status/")
-async def ModelStatus():
-    return await get_model_status()
+
+@app.post("/api/update_collection/{subject_id}/{class_id}")
+async def Update(subject_id: str, class_id: str):
+    return await update_collection_active_time(subject_id, class_id)
+
+
 
 
 
@@ -518,6 +574,19 @@ async def weekly_attendance(class_id: str = "CLS001", year: int = datetime.now()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/teacher/dashboard/low-academic-attendance")
+async def low_academic_attendance(threshold: float = 80.0):
+    try:
+        return await get_low_attendance_students(threshold)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) 
+    
+@app.get("/api/teacher/dashboard/low-attendance-count")
+async def low_attendance_count():
+    try:
+        return await get_low_attendance_students_count()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 #Admin Dashboard Routes
 @app.get("/api/admin/dashboard/users")
 async def users(search_with_id: str = None, role: str = None, class_id: str = None):

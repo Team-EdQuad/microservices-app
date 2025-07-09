@@ -248,6 +248,31 @@ async def upload_content(
 class CategorizedSubmissionsResponse(BaseModel):
     on_time_submissions: List[SubmissionResponse]
     late_submissions: List[SubmissionResponse]
+from fastapi import APIRouter, HTTPException
+from typing import List, Optional
+from pydantic import BaseModel
+from datetime import datetime
+
+router = APIRouter()
+
+class SubmissionResponse(BaseModel):
+    submission_id: str
+    subject_id: str
+    subject_name: Optional[str] = None  
+    content_file_id: str
+    submit_time_date: datetime
+    class_id: str
+    class_name: Optional[str] = None
+    file_name: str
+    marks: Optional[int] = None
+    assignment_id: str
+    assignment_name: Optional[str] = None 
+    student_id: str
+    teacher_id: str
+
+class CategorizedSubmissionsResponse(BaseModel):
+    on_time_submissions: List[SubmissionResponse]
+    late_submissions: List[SubmissionResponse]
 
 @router.get("/submission_view/{teacher_id}", response_model=CategorizedSubmissionsResponse)
 async def view_manual_submission(teacher_id: str):
@@ -274,20 +299,32 @@ async def view_manual_submission(teacher_id: str):
                 ]
             })
 
-    # Categorize submissions
-    on_time_submissions = []
-    late_submissions = []
+    on_time = []
+    late = []
 
     for f in filters:
         submissions_cursor = db["submission"].find(f)
         for submission in submissions_cursor:
-            assignment = db["assignment"].find_one({"assignment_id": submission["assignment_id"]})
-            deadline = None
-            if assignment:
-                submission["assignment_name"] = assignment.get("assignment_name")
-                deadline = assignment.get("deadline")
+            assignment = db["assignment"].find_one(
+                {"assignment_id": submission["assignment_id"]},
+                {"assignment_name": 1, "deadline": 1, "_id": 0}
+            )
 
-            # Convert ISO strings to datetime for comparison (if needed)
+            submission["assignment_name"] = assignment.get("assignment_name") if assignment else None
+            deadline = assignment.get("deadline") if assignment else None
+
+            # Add class_name and subject_name
+            class_doc = db["class"].find_one(
+                {"class_id": submission["class_id"]}, {"class_name": 1, "_id": 0}
+            )
+            subject_doc = db["subject"].find_one(
+                {"subject_id": submission["subject_id"]}, {"subject_name": 1, "_id": 0}
+            )
+
+            submission["class_name"] = class_doc.get("class_name") if class_doc else None
+            submission["subject_name"] = subject_doc.get("subject_name") if subject_doc else None
+
+            # Convert submit_time and deadline to datetime
             submit_time = submission.get("submit_time_date")
             if isinstance(submit_time, str):
                 submit_time = datetime.fromisoformat(submit_time)
@@ -295,17 +332,19 @@ async def view_manual_submission(teacher_id: str):
             if isinstance(deadline, str):
                 deadline = datetime.fromisoformat(deadline)
 
-            if deadline and submit_time and submit_time > deadline:
-                late_submissions.append(SubmissionResponse(**submission))
-            else:
-                on_time_submissions.append(SubmissionResponse(**submission))
+            response = SubmissionResponse(**submission)
 
-    if not on_time_submissions and not late_submissions:
-        raise HTTPException(status_code=404, detail="No manual submissions found")
+            if deadline and submit_time and submit_time > deadline:
+                late.append(response)
+            else:
+                on_time.append(response)
+
+    if not on_time and not late:
+        raise HTTPException(status_code=404, detail="No submissions found")
 
     return CategorizedSubmissionsResponse(
-        on_time_submissions=on_time_submissions,
-        late_submissions=late_submissions
+        on_time_submissions=on_time,
+        late_submissions=late
     )
 
 @router.post("/update_submission_marks/{teacher_id}", response_model=SubmissionResponse)
@@ -460,7 +499,7 @@ async def get_students_by_class_and_subject(class_id: str, subject_id: str):
 
 
 
-@router.get("/auto_graded_submissions/{teacher_id}", response_model=List[SubmissionResponse])
+@router.get("/auto_graded_submissions/{teacher_id}", response_model=CategorizedSubmissionsResponse)
 async def view_auto_graded_submissions(teacher_id: str):
     teacher_data = db["teacher"].find_one({"teacher_id": teacher_id})
     if not teacher_data:
@@ -470,7 +509,6 @@ async def view_auto_graded_submissions(teacher_id: str):
     if not subjects_classes:
         raise HTTPException(status_code=404, detail="No subjects or classes found for this teacher")
 
-    # Build a list of subject-class combinations
     filters = []
     for item in subjects_classes:
         subject_id = item.get("subject_id")
@@ -480,24 +518,56 @@ async def view_auto_graded_submissions(teacher_id: str):
                 "teacher_id": teacher_id,
                 "subject_id": subject_id,
                 "class_id": cls_id,
-                "grading_type": "auto"  # Only fetch auto-graded submissions
+                "grading_type": "auto"
             })
 
-    # Collect matching auto-graded submissions
-    auto_graded_submissions = []
+    on_time = []
+    late = []
+
     for f in filters:
         submissions_cursor = db["grading_submissions"].find(f)
         for submission in submissions_cursor:
-            # Add assignment name
-            assignment = db["assignment"].find_one({"assignment_id": submission["assignment_id"]})
-            if assignment:
-                submission["assignment_name"] = assignment.get("assignment_name")
-            auto_graded_submissions.append(submission)
+            # Get assignment info
+            assignment = db["assignment"].find_one(
+                {"assignment_id": submission["assignment_id"]},
+                {"assignment_name": 1, "deadline": 1, "_id": 0}
+            )
+            submission["assignment_name"] = assignment.get("assignment_name") if assignment else None
+            deadline = assignment.get("deadline") if assignment else None
 
-    if not auto_graded_submissions:
-        raise HTTPException(status_code=404, detail="No auto-graded submissions found for review")
+            # Add class and subject names
+            class_doc = db["class"].find_one({"class_id": submission["class_id"]}, {"class_name": 1})
+            subject_doc = db["subject"].find_one({"subject_id": submission["subject_id"]}, {"subject_name": 1})
 
-    return [SubmissionResponse(**submission) for submission in auto_graded_submissions]
+            submission["class_name"] = class_doc.get("class_name") if class_doc else None
+            submission["subject_name"] = subject_doc.get("subject_name") if subject_doc else None
+
+            # Ensure submit_time_date is datetime
+            submit_time = submission.get("submit_time_date")
+            if isinstance(submit_time, str):
+                submit_time = datetime.fromisoformat(submit_time)
+
+            if isinstance(deadline, str):
+                deadline = datetime.fromisoformat(deadline)
+
+            submission["submit_time_date"] = submit_time  # for model parsing
+
+            # Convert to Pydantic model
+            try:
+                response_model = SubmissionResponse(**submission)
+                if deadline and submit_time and submit_time > deadline:
+                    late.append(response_model)
+                else:
+                    on_time.append(response_model)
+            except Exception as e:
+                print(f"Skipping invalid submission: {e}")
+                continue
+
+    return CategorizedSubmissionsResponse(
+        on_time_submissions=on_time,
+        late_submissions=late
+    )
+
 
 
 @router.post("/review_auto_graded_marks/{teacher_id}", response_model=SubmissionResponse)

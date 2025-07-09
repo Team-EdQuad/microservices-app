@@ -46,21 +46,19 @@ class SubjectClassResponse(BaseModel):
     subjects_classes: List[SubjectWithClasses]
 
 
+
 #student submission
 class SubmissionResponse(BaseModel):
     submission_id: str
-    subject_id: str
-    subject_name: Optional[str] = None  
-    content_file_id: str
-    submit_time_date: datetime
-    class_id: str
-    class_name: Optional[str] = None
-    file_name: str
-    marks: Optional[int] = None
-    assignment_id: str
-    assignment_name: Optional[str] = None 
     student_id: str
+    assignment_id: str
+    subject_id: str
+    class_id: str
+    file_name: str
+    submit_time_date: datetime
     teacher_id: str
+    marks: Optional[int] = None
+    assignment_name: Optional[str] = None
 
 
 class AssignmentItem(BaseModel):

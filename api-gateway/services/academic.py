@@ -336,14 +336,13 @@ async def upload_content_request(class_id: str, subject_id: str, content_name: s
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Error uploading content: {str(exc)}")
 
-
 async def view_ungraded_manual_submissions(teacher_id: str):
     try:
         async with httpx.AsyncClient() as client:
             url = f"{ACADEMIC_SERVICE_URL}/submission_view/{teacher_id}"
             response = await client.get(url)
             response.raise_for_status()
-            return response.json()
+            return response.json()  # Already returns dict with two keys
     except httpx.HTTPStatusError as exc:
         raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
     except Exception as exc:

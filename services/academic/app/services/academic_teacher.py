@@ -3,6 +3,8 @@ import uuid
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from typing import List
+
+from openai import BaseModel
 from ..models.academic import StudentResponse,AssignmentResponse, ClassResponse, ContentUploadResponse, StudentsResponse,SubjectClassResponse, SubjectResponse, SubjectWithClasses,SubmissionResponse
 from .database import db
 from .google_drive import get_drive_service, FOLDER_IDS
@@ -240,10 +242,14 @@ async def upload_content(
     except Exception as e:
         logger.error(f"[ERROR] Uploading content_id={content_id} -> {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to upload content: {str(e)}")
-      
 
-#view submission ( teacher )
-@router.get("/submission_view/{teacher_id}", response_model=List[SubmissionResponse])
+
+
+class CategorizedSubmissionsResponse(BaseModel):
+    on_time_submissions: List[SubmissionResponse]
+    late_submissions: List[SubmissionResponse]
+
+@router.get("/submission_view/{teacher_id}", response_model=CategorizedSubmissionsResponse)
 async def view_manual_submission(teacher_id: str):
     teacher_data = db["teacher"].find_one({"teacher_id": teacher_id})
     if not teacher_data:
@@ -253,7 +259,6 @@ async def view_manual_submission(teacher_id: str):
     if not subjects_classes:
         raise HTTPException(status_code=404, detail="No subjects or classes found for this teacher")
 
-    # Build a list of subject-class combinations
     filters = []
     for item in subjects_classes:
         subject_id = item.get("subject_id")
@@ -269,22 +274,39 @@ async def view_manual_submission(teacher_id: str):
                 ]
             })
 
-    # Collect matching submissions
-    manual_submissions = []
+    # Categorize submissions
+    on_time_submissions = []
+    late_submissions = []
+
     for f in filters:
         submissions_cursor = db["submission"].find(f)
         for submission in submissions_cursor:
-            # Optionally add assignment name
             assignment = db["assignment"].find_one({"assignment_id": submission["assignment_id"]})
+            deadline = None
             if assignment:
                 submission["assignment_name"] = assignment.get("assignment_name")
-            manual_submissions.append(submission)
+                deadline = assignment.get("deadline")
 
-    if not manual_submissions:
+            # Convert ISO strings to datetime for comparison (if needed)
+            submit_time = submission.get("submit_time_date")
+            if isinstance(submit_time, str):
+                submit_time = datetime.fromisoformat(submit_time)
+
+            if isinstance(deadline, str):
+                deadline = datetime.fromisoformat(deadline)
+
+            if deadline and submit_time and submit_time > deadline:
+                late_submissions.append(SubmissionResponse(**submission))
+            else:
+                on_time_submissions.append(SubmissionResponse(**submission))
+
+    if not on_time_submissions and not late_submissions:
         raise HTTPException(status_code=404, detail="No manual submissions found")
 
-    return [SubmissionResponse(**submission) for submission in manual_submissions]
-
+    return CategorizedSubmissionsResponse(
+        on_time_submissions=on_time_submissions,
+        late_submissions=late_submissions
+    )
 
 @router.post("/update_submission_marks/{teacher_id}", response_model=SubmissionResponse)
 async def update_submission_marks(

@@ -248,8 +248,23 @@ async def upload_content(
 ):
     return await upload_content_request(class_id, subject_id, content_name, description, file)
 
+class SubmissionResponse(BaseModel):
+    submission_id: str
+    student_id: str
+    assignment_id: str
+    subject_id: str
+    class_id: str
+    file_name: str
+    submit_time_date: datetime
+    teacher_id: str
+    marks: Optional[int] = None
+    assignment_name: Optional[str] = None
+    
+class CategorizedSubmissionsResponse(BaseModel):
+    on_time_submissions: List[SubmissionResponse]
+    late_submissions: List[SubmissionResponse]
 
-@app.get("/api/submission_view/{teacher_id}", response_model=List)
+@app.get("/api/submission_view/{teacher_id}", response_model=CategorizedSubmissionsResponse)
 async def get_manual_submissions(teacher_id: str):
     return await view_ungraded_manual_submissions(teacher_id)
 

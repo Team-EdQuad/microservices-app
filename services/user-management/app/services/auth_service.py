@@ -113,7 +113,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
                 "first_name": user_doc.get("first_name"),
                 "last_name": user_doc.get("last_name"),
                 "gender": user_doc.get("gender"),
-                "phone": user_doc.get("Phone_no"),  # normalize key here
+                "phone_no": user_doc.get("Phone_no"),  # normalize key here
                 "join_date": user_doc.get("join_date"),
                 "last_edit_date": user_doc.get("last_edit_date"),
                 "subjects_classes": user_doc.get("subjects_classes", []),
@@ -142,7 +142,7 @@ def transform_student_doc_to_model(doc: dict) -> dict:
         "gender": doc.get("gender", "").lower(),
         "class_id": doc.get("class_id", ""),
         "phone_no": str(doc.get("phone_no", "")),
-        "subject": doc.get("subject_id", []),
+        "subject_id": doc.get("subject_id", []),
         "club_id": doc.get("club_id", []),
         "sport_id": doc.get("sport_id", []),
         "join_date": parse_date(doc.get("join_date")),

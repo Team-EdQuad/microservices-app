@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from .database import assignment_table, submission_table, class_table, teacher_table, subject_table,student_table
-from .database import academic_attendance_table, exam_table, non_academic_attendance_table, content_table, student_content_table
+from .database import academic_attendance_table, exam_table, non_academic_attendance_table, content_table, student_content_table, behavioural_table,grading_submissions
 from ..schemas.teacher_dashboard import  all_uploaded_assignments, all_progress
 from ..models.teacher_dashboard import ExamMarksResponse, StudentProgress
 from bson.objectid import ObjectId
@@ -58,16 +58,25 @@ async def get_uploaded_assignments(teacher_id: str):
                         except:
                             deadline = None
                     
-                    submission_count = submission_table.count_documents({
+                    # submission_count = submission_table.count_documents({
+                    #     "assignment_id": assignment.get("assignment_id")
+                    # })
+                    submission_count_manual = submission_table.count_documents({
                         "assignment_id": assignment.get("assignment_id")
                     })
+
+                    submission_count_grading = grading_submissions.count_documents({
+                        "assignment_id": assignment.get("assignment_id")
+                    })
+
+                    total_submission_count = submission_count_manual + submission_count_grading
 
                     assignment_timeline.append({
                         "assignment_name": assignment.get("assignment_name"),
                         "subject_name": subject.get("subject_name"),
                         "class_name": class_name,
                         "deadline": deadline,
-                        "submission_count": submission_count,
+                        "submission_count": total_submission_count,
                         "total_students": total_students
                     })
 
@@ -226,7 +235,7 @@ async def get_student_progress(class_id: str, year: int = None):
                     total_contents = content_table.count_documents({
                         "subject_id": subject_id,
                         "class_id": class_id,
-                        "Date": {"$regex": f"^{year}-"}
+                        "upload_date": {"$regex": f"^{year}-"}
                     })
 
                     if total_contents == 0:
@@ -236,7 +245,7 @@ async def get_student_progress(class_id: str, year: int = None):
                     contents = content_table.find({
                         "subject_id": subject_id,
                         "class_id": class_id,
-                        "Date": {"$regex": f"^{year}-"}
+                        "upload_date": {"$regex": f"^{year}-"}
                     })
 
                     for content in contents:
@@ -245,7 +254,8 @@ async def get_student_progress(class_id: str, year: int = None):
                             "content_id": content_id,
                             "student_id": student_id,
                             "status": "Active",
-                            "class_id": class_id
+                            "class_id": class_id,
+                            "subject_id": subject_id
                         })
                         if student_content:
                             completed_contents += 1
@@ -313,8 +323,8 @@ async def get_weekly_attendance(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving attendance data: {str(e)}")
     
-@teacher_dashboard_router.get("/low-academic-attendance", response_model=List[dict])
-async def get_low_attendance_students(threshold: float = 80.0):
+@teacher_dashboard_router.get("/low-academic-attendance")
+def get_low_attendance_students(threshold: float = 90.0):
     try:
         students = list(student_table.find({}))
         if not students:
@@ -324,12 +334,12 @@ async def get_low_attendance_students(threshold: float = 80.0):
         if not attendance_records:
             raise HTTPException(status_code=404, detail="No academic attendance records found.")
 
-        # Map: student_id -> {class_id, full_name, total_days, present_days}
-        attendance_summary = defaultdict(lambda: {"class_id": "", "full_name": "", "total": 0, "present": 0})
+        attendance_summary = defaultdict(lambda: {"total": 0, "present": 0})
+        current_year = datetime.now().year
 
         for record in attendance_records:
             date = datetime.strptime(record["date"], "%Y-%m-%d")
-            if date.year != datetime.now().year:
+            if date.year != current_year:
                 continue
 
             for student_id, status in record.get("status", {}).items():
@@ -337,33 +347,28 @@ async def get_low_attendance_students(threshold: float = 80.0):
                 if status == "present":
                     attendance_summary[student_id]["present"] += 1
 
-        low_attendance_list = []
-
+        low_attendance_students = []
         for student in students:
             sid = student["student_id"]
             if sid not in attendance_summary:
-                continue  # No attendance data
+                continue
 
-            summary = attendance_summary[sid]
-            summary["class_id"] = student.get("class_id", "")
-            summary["full_name"] = student.get("full_name", f"{student.get('first_name', '')} {student.get('last_name', '')}".strip())
+            total = attendance_summary[sid]["total"]
+            present = attendance_summary[sid]["present"]
+            attendance_rate = (present / total) * 100 if total > 0 else 0
 
-            total = summary["total"]
-            present = summary["present"]
-            attendance_pct = (present / total) * 100 if total > 0 else 0
-
-            if attendance_pct < threshold:
-                low_attendance_list.append({
+            if attendance_rate < threshold:
+                low_attendance_students.append({
                     "student_id": sid,
-                    "full_name": summary["full_name"],
-                    "class_id": summary["class_id"],
-                    "attendance_rate": round(attendance_pct, 2)
+                    "full_name": student.get("full_name", ""),
+                    "class_id": student.get("class_id", ""),
+                    "attendance_rate": round(attendance_rate, 2)
                 })
 
-        return low_attendance_list
+        return {"low_attendance_students": low_attendance_students}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving low attendance students: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
     
 @teacher_dashboard_router.get("/low-attendance-count")
 def get_low_attendance_student_count(threshold: float = 80.0):

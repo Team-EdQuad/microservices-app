@@ -541,7 +541,8 @@ async def update_content_status(content_id: str, payload: StatusUpdateRequest):
         # Filter remains the same
         {
             "student_id": student_id, 
-            "content_id": content_id
+            "content_id": content_id,
+            "subject_id": subject_id
         },
         {
             "$set": {

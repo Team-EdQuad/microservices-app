@@ -14,7 +14,7 @@ class TeacherModel(BaseModel):
     first_name: str
     last_name: str
     gender: Optional[str]
-    phone: Optional[str]  # Note: must match the key you pass
+    phone_no: Optional[str]  # Note: must match the key you pass
     join_date: str
     last_edit_date: str
     subjects_classes: List[SubjectClass]

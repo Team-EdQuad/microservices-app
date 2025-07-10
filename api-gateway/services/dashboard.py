@@ -9,13 +9,15 @@ DASHBOARD_SERVICE_URL = "http://dashboard:8000"
 
 #---------------Student Dashboard Routes------------------
 async def get_student_progress(student_id: str, class_id: str):
-    async with httpx.AsyncClient() as client:
+    timeout = httpx.Timeout(20.0, connect=10.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.get(f"{DASHBOARD_SERVICE_URL}/student/{student_id}/{class_id}/progress")
         response.raise_for_status()
         return response.json()
 
 async def get_student_assignments(student_id: str, class_id: str):
-    async with httpx.AsyncClient() as client:
+    timeout = httpx.Timeout(20.0, connect=10.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.get(f"{DASHBOARD_SERVICE_URL}/student/{student_id}/{class_id}/assignments")
         response.raise_for_status()
         return response.json()
@@ -97,13 +99,18 @@ async def get_model_feedback(student_id: str, class_id: str):
 
 #-----------------Teacher Dashboard Routes------------------
 async def get_teacher_assignments(teacher_id: str):
-    async with httpx.AsyncClient() as client:
-        response = await client.get(f"{DASHBOARD_SERVICE_URL}/teacher/{teacher_id}/assignments")
-        response.raise_for_status()
-        return response.json()
-
+    try:
+        timeout = httpx.Timeout(20.0, connect=10.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.get(f"{DASHBOARD_SERVICE_URL}/teacher/{teacher_id}/assignments")
+            response.raise_for_status()
+            return response.json()
+    except httpx.ReadTimeout:
+        raise HTTPException(status_code=504, detail="Dashboard service timeout")
+    
 async def get_all_Classes():
-    async with httpx.AsyncClient() as client:
+    timeout = httpx.Timeout(20.0, connect=10.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.get(f"{DASHBOARD_SERVICE_URL}/teacher/classes")
         response.raise_for_status()
         return response.json()
@@ -116,7 +123,8 @@ async def get_exam_marks_teacher(class_id: str, exam_year: str):
 
 
 async def get_student_progress_teacher(class_id: str, year:int =None):
-    async with httpx.AsyncClient() as client:
+    timeout = httpx.Timeout(20.0, connect=10.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.get(f"{DASHBOARD_SERVICE_URL}/teacher/{class_id}/student_progress",
         params={"year": year}
         )
@@ -133,9 +141,10 @@ async def get_weekly_attendance(class_id: str, year: int, week_num: int):
         response.raise_for_status()
         return response.json()
     
-async def get_low_attendance_students(threshold: float = 80.0):
+async def get_low_attendance_students(threshold: float = 90.0):
     try:
-        async with httpx.AsyncClient() as client:
+        timeout = httpx.Timeout(20.0, connect=10.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.get(f"{DASHBOARD_SERVICE_URL}/teacher/low-academic-attendance",
                                         params={"threshold": threshold})
             response.raise_for_status()
@@ -145,7 +154,8 @@ async def get_low_attendance_students(threshold: float = 80.0):
     
 async def get_low_attendance_students_count():
     try:
-        async with httpx.AsyncClient() as client:
+        timeout = httpx.Timeout(20.0, connect=10.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.get(f"{DASHBOARD_SERVICE_URL}/teacher/low-attendance-count")
             response.raise_for_status()
             return response.json()

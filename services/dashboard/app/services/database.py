@@ -25,6 +25,7 @@ non_academic_attendance_table = db["non_academic_attendance"]
 exam_table = db["exam_marks"]
 
 behavioural_table = db["behavioral_analysis"]
+grading_submissions=db["grading_submissions"]
 
 class_table = db["class"]
 teacher_table = db["teacher"]

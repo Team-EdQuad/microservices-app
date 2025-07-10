@@ -59,12 +59,19 @@ async def get_students_by_class():
         today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         today_end = today_start + timedelta(days=1)
 
-        active_today = student_login_table.count_documents({
-            "timestamp": {
-                "$gte": today_start.strftime("%Y-%m-%d %H:%M:%S"),
-                "$lt": today_end.strftime("%Y-%m-%d %H:%M:%S")
-            }
-        })
+        start_str = today_start.strftime("%Y-%m-%d %H:%M:%S")
+        end_str = today_end.strftime("%Y-%m-%d %H:%M:%S")
+
+        pipeline = [
+            {"$match": {"loginTime": {"$gte": start_str, "$lt": end_str}}},
+            {"$group": {"_id": "$student_id"}},
+            {"$count": "distinct_students"}
+        ]
+
+        result = list(student_login_table.aggregate(pipeline))
+        active_today = result[0]['distinct_students'] if result else 0
+
+
 
         data= {
             "total_students": student_count,

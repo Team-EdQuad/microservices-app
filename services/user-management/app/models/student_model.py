@@ -14,7 +14,7 @@ class StudentRegistration(BaseModel):
     # grade: int = Field(..., ge=1, le=13)
     class_id: str
     phone_no: str = Field(..., pattern=r"^\d{10}$")
-    subject: List[str]
+    subject_id: List[str]
     join_date: date
     last_edit_date: date
     club_id: List[str] = []

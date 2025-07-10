@@ -1,13 +1,13 @@
 from fastapi import APIRouter, HTTPException
 from .database import student_table, subject_table, content_table, student_content_table
 from .database import assignment_table, submission_table, academic_attendance_table
-from .database import exam_table, behavioural_table
+from .database import exam_table, behavioural_table,grading_submissions
 from .database import collection31 ,collection32
 from  ..schemas.student_dashboard import all_progress, all_assignments, academic_attendance_rate
 from ..models.student_dashboard import SubjectProgress, SubjectAssignment, AcademicAttendanceRate, ExamMarksResponse
 from bson.objectid import ObjectId
 from typing import List
-from datetime import datetime
+from datetime import datetime,timezone
 from collections import defaultdict
 
 student_dashboard_router = APIRouter()
@@ -83,8 +83,14 @@ async def get_student_assignments(student_id: str, class_id: str):
 
 
             assignments = assignment_table.find({"subject_id":subject_id, "class_id": class_id })
-            submissions = list(submission_table.find({"student_id": student_id, "class_id": class_id, "subject_id": subject_id}))
-          
+            manual_submissions = list(submission_table.find({"student_id": student_id, "class_id": class_id, "subject_id": subject_id}))
+            graded_submissions = list(grading_submissions.find({
+                "student_id": student_id,
+                "class_id": class_id,
+                "subject_id": subject_id
+            }))
+            submissions = manual_submissions + graded_submissions
+
 
             for assignment in assignments:
                 assignment["status"] = "Not Completed"
@@ -96,11 +102,14 @@ async def get_student_assignments(student_id: str, class_id: str):
                 deadline = assignment.get("deadline")
                 if isinstance(deadline, str):
                     deadline = datetime.fromisoformat(deadline)
+                if deadline is not None and deadline.tzinfo is None:
+                    deadline = deadline.replace(tzinfo=timezone.utc)
                 
+                now = datetime.now(timezone.utc)
 
                
                 if assignment["status"] != "Completed":
-                    if deadline and deadline < datetime.now():
+                    if deadline and deadline < now:
                         assignment["status"] = "Overdue"
 
                     else :

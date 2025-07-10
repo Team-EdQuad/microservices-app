@@ -49,7 +49,7 @@ async def register_student(student: StudentRegistration):
             student_data["_id"] = str(result.inserted_id)
 
             # Update subject-student relationship
-            for subject_id in student.subject:
+            for subject_id in student.subject_id:
                 await subjects_collection.update_one(
                     {"subject_id": subject_id},
                     {"$addToSet": {"students": student.student_id}},

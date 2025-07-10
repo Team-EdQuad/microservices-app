@@ -12,7 +12,8 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles 
 from fastapi import Query
 from datetime import date
-
+import logging
+import traceback
 
 
 import json
@@ -535,12 +536,23 @@ async def dashboard_model_feedback(student_id: str, class_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 #Teacher Dashboard Routes
+# @app.get("/api/teacher/dashboard/{teacher_id}/assignments")
+# async def teacher_assignments(teacher_id: str):
+#     try:
+#         return await get_teacher_assignments(teacher_id)
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+    
 @app.get("/api/teacher/dashboard/{teacher_id}/assignments")
 async def teacher_assignments(teacher_id: str):
     try:
         return await get_teacher_assignments(teacher_id)
+    except httpx.HTTPStatusError as e:
+        logging.error(f"Dashboard service error: {e.response.status_code} - {e.response.text}")
+        raise HTTPException(status_code=e.response.status_code, detail=e.response.text)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logging.error("Unexpected error: %s", traceback.format_exc())
+        raise HTTPException(status_code=500, detail="Internal server error")
     
 @app.get("/api/teacher/dashboard/classes")
 async def get_all_classes():

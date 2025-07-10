@@ -10,6 +10,7 @@ from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 import io
 import logging
 from tenacity import retry, stop_after_attempt, wait_exponential
+from dateutil.parser import isoparse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -161,7 +162,9 @@ async def create_assignment(
 
         # Convert deadline safely
         try:
-            deadline_dt = datetime.fromisoformat(deadline)
+            # deadline_dt = datetime.fromisoformat(deadline)
+            deadline_dt = isoparse(deadline)
+
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid deadline format. Use ISO format (e.g., 2025-04-30T23:59:00)")
 
@@ -187,7 +190,11 @@ async def create_assignment(
         return AssignmentResponse(**assignment_data)
 
     except Exception as e:
-        logger.error(f"[ERROR] Creating assignment_id={assignment_id} -> {str(e)}")
+        import traceback
+        tb = traceback.format_exc()
+        logger.error(f"[ERROR] Creating assignment_id={assignment_id} -> {str(e)}\n{tb}")
+        print(f"[ERROR] Creating assignment_id={assignment_id} -> {str(e)}\n{tb}")  # Add this line temporarily
+        print(tb)
         raise HTTPException(status_code=500, detail=f"Failed to create assignment: {str(e)}")
     
 #upload content

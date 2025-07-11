@@ -50,8 +50,7 @@ def download_from_drive(drive_service, file_id):
 
 @router.get("/content/{content_id}")
 async def get_content_by_id(content_id: str):
-    try:
-        
+    try:        
         content = db["content"].find_one({"content_id": content_id})
         
         if not content:

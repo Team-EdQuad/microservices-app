@@ -249,7 +249,27 @@ async def upload_content(
     return await upload_content_request(class_id, subject_id, content_name, description, file)
 
 
-@app.get("/api/submission_view/{teacher_id}", response_model=List)
+
+class SubmissionResponse(BaseModel):
+    submission_id: str
+    subject_id: str
+    subject_name: Optional[str] = None  
+    content_file_id: str
+    submit_time_date: datetime
+    class_id: str
+    class_name: Optional[str] = None
+    file_name: str
+    marks: Optional[int] = None
+    assignment_id: str
+    assignment_name: Optional[str] = None 
+    student_id: str
+    teacher_id: str
+
+class CategorizedSubmissionsResponse(BaseModel):
+    on_time_submissions: List[SubmissionResponse]
+    late_submissions: List[SubmissionResponse]
+
+@app.get("/api/submission_view/{teacher_id}", response_model=CategorizedSubmissionsResponse)
 async def get_manual_submissions(teacher_id: str):
     return await view_ungraded_manual_submissions(teacher_id)
 
@@ -286,7 +306,7 @@ async def update_exam_marks(
 
     return await add_exam_marks_request(form_data)
 
-@app.get("/api/auto_graded_submissions/{teacher_id}")
+@app.get("/api/auto_graded_submissions/{teacher_id}",response_model=CategorizedSubmissionsResponse)
 async def get_auto_graded_submissions(teacher_id: str):
     return await view_auto_graded_submissions_request(teacher_id)
 

@@ -24,14 +24,6 @@ UPLOAD_DIR = "local_uploads"
 
 router = APIRouter()
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-def upload_to_drive(drive_service, file_metadata, media):
-    return drive_service.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields='id'
-    ).execute()
-
 @router.get("/submission/file/{submission_id}")
 async def get_submission_file(submission_id: str):
     try:
@@ -205,7 +197,7 @@ async def upload_content(
             "content_id": content_id,
             "content_name": content_name,
             "content_file_path": file_path, # Store the local file path
-            "upload_date": datetime.utcnow().strftime("%Y-%m-%d"),
+            "upload_date": datetime.now().strftime("%Y-%m-%d"),
             "description": description,
             "class_id": class_id,
             "subject_id": subject_id

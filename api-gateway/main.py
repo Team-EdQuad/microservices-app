@@ -132,7 +132,7 @@ async def add_sport(sport: dict):
     return await create_sport(sport)
 
 # Academic
-@app.get("/api/content/{content_id}")
+@app.get("/api/content/file/{content_id}")
 async def get_content_file(content_id: str):
     return await get_content_file_by_id(content_id)
 

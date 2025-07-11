@@ -15,12 +15,10 @@ async def get_content_file_by_id(content_id: str):
             print(f"Response status: {response.status_code}")
             response.raise_for_status()
 
-            content_type = response.headers.get("content-type", "application/pdf")
-            content_disposition = response.headers.get(
-                "content-disposition", f"inline; filename={content_id}.pdf"
-            )
-
-            # ✅ Use io.BytesIO for proper StreamingResponse
+            content_type = response.headers.get("content-type", "application/octet-stream")
+            content_disposition = response.headers.get("content-disposition", "attachment")
+            filename = response.headers.get("filename", f"file-{content_id}")
+            #Use io.BytesIO for proper StreamingResponse
             return StreamingResponse(
                 io.BytesIO(response.content),
                 media_type=content_type,

@@ -29,10 +29,6 @@ router = APIRouter()
 
 @router.get("/content/file/{content_id}")
 async def serve_content_file(content_id: str):
-    """
-    Serves a content file by trusting the absolute path stored in the database.
-    This logic is identical to the proven serve_assignment_file function.
-    """
     try:
         # 1. Find the content document in the database
         content = db["content"].find_one({"content_id": content_id})
@@ -52,20 +48,16 @@ async def serve_content_file(content_id: str):
             print(f"[ERROR] CRITICAL: File does not exist at the path from the database: {file_path}")
             raise HTTPException(status_code=404, detail=f"File not found on the server's disk.")
 
-        # 4. Determine media type and serve the file
-        media_type, _ = mimetypes.guess_type(file_path)
-        if media_type is None:
-            media_type = "application/octet-stream"
+
+        ext = os.path.splitext(file_path)[1].lower()
+        media_type = "application/pdf" if ext == ".pdf" else "text/plain" if ext == ".txt" else "application/octet-stream"
 
         return FileResponse(
             path=file_path,
             media_type=media_type,
             filename=os.path.basename(file_path),
+            headers={"Content-Disposition": f"inline; filename={os.path.basename(file_path)}"}
         )
-
-    except HTTPException:
-        # Let FastAPI handle its own exceptions by re-raising them
-        raise
     except Exception as e:
         # Catch any other unexpected crash and log it
         print(f"[CRITICAL ERROR] An unexpected exception occurred in serve_content_file: {e}")

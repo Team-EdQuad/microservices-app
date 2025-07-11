@@ -3,7 +3,6 @@ import uuid
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from typing import List
-
 from openai import BaseModel
 from ..models.academic import StudentResponse,AssignmentResponse, ClassResponse, ContentUploadResponse, StudentsResponse,SubjectClassResponse, SubjectResponse, SubjectWithClasses,SubmissionResponse
 from .database import db
@@ -14,6 +13,7 @@ import logging
 from tenacity import retry, stop_after_attempt, wait_exponential
 import os
 import aiofiles
+from fastapi.responses import FileResponse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -32,7 +32,6 @@ def upload_to_drive(drive_service, file_metadata, media):
         fields='id'
     ).execute()
 
-
 @router.get("/submission/file/{submission_id}")
 async def get_submission_file(submission_id: str):
     try:
@@ -44,34 +43,19 @@ async def get_submission_file(submission_id: str):
         if not submission:
             raise HTTPException(status_code=404, detail="Submission not found")
         
-        content_file_id = submission.get("content_file_id")
-        if not content_file_id:
-            raise HTTPException(status_code=404, detail="File not found for this submission")
+        # Get the LOCAL file path from the record
+        file_path = submission.get("content_file_path")
+        if not file_path or not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="File not found on the server for this submission.")
         
-        # Download file from Google Drive
-        drive_service = get_drive_service()
-        # Helper function to download file from Google Drive
-        def download_from_drive(service, file_id):
-            request = service.files().get_media(fileId=file_id)
-            file_io = io.BytesIO()
-            downloader = MediaIoBaseDownload(file_io, request)
-            done = False
-            while not done:
-                status, done = downloader.next_chunk()
-            file_io.seek(0)
-            return file_io
-
-        file_io = download_from_drive(drive_service, content_file_id)
+        file_name = os.path.basename(file_path)
         
-        # Get file metadata for content type
-        file_metadata = drive_service.files().get(fileId=content_file_id).execute()
-        content_type = file_metadata.get('mimeType', 'application/octet-stream')
-        
-        # Return file as streaming response
-        return StreamingResponse(
-            io.BytesIO(file_io.getvalue()),
-            media_type=content_type,
-            headers={"Content-Disposition": f"inline; filename={submission.get('file_name', 'file')}"}
+        # Return file from local path using FileResponse
+        return FileResponse(
+            path=file_path,
+            filename=file_name,
+            media_type='application/octet-stream', # Browser will handle based on extension
+            headers={"Content-Disposition": f"inline; filename=\"{file_name}\""}
         )
         
     except Exception as e:
@@ -190,7 +174,7 @@ async def create_assignment(
         raise HTTPException(status_code=500, detail=f"Failed to create assignment: {str(e)}")
 
 
-#upload content# 
+#upload content
 @router.post("/contentupload/{class_id}/{subject_id}", response_model=ContentUploadResponse)
 async def upload_content(
     class_id: str,
@@ -230,38 +214,13 @@ async def upload_content(
         db["content"].insert_one(content_data)
         
         # Adjust your ContentUploadResponse model to expect 'content_file_path'
-        return content_data
+        return ContentUploadResponse(**content_data)
 
     except Exception as e:
         logger.error(f"[ERROR] Uploading content_id={content_id} -> {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to upload content: {str(e)}")
     
 
-
-class CategorizedSubmissionsResponse(BaseModel):
-    on_time_submissions: List[SubmissionResponse]
-    late_submissions: List[SubmissionResponse]
-from fastapi import APIRouter, HTTPException
-from typing import List, Optional
-from pydantic import BaseModel
-from datetime import datetime
-
-router = APIRouter()
-
-class SubmissionResponse(BaseModel):
-    submission_id: str
-    subject_id: str
-    subject_name: Optional[str] = None  
-    content_file_id: str
-    submit_time_date: datetime
-    class_id: str
-    class_name: Optional[str] = None
-    file_name: str
-    marks: Optional[int] = None
-    assignment_id: str
-    assignment_name: Optional[str] = None 
-    student_id: str
-    teacher_id: str
 
 class CategorizedSubmissionsResponse(BaseModel):
     on_time_submissions: List[SubmissionResponse]

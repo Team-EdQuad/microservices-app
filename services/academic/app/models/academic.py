@@ -10,7 +10,7 @@ class SubjectResponse(BaseModel):
 class ContentResponse(BaseModel):
     content_id: str
     content_name: str
-    content_file_id: Optional[str] = None  # Optional field
+    content_file_path: Optional[str] = None  # Optional field
     Date: Optional[datetime] = None
     description: Optional[str] = None
     class_id: str
@@ -77,7 +77,7 @@ class AssignmentListResponse(BaseModel):
 class AssignmentViewResponse(BaseModel):
     assignment_id: str
     assignment_name: str
-    assignment_file_id : str
+    assignment_file_path : str
     Deadline: datetime
     class_id: str
     subject_id: str

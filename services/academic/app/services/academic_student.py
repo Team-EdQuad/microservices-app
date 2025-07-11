@@ -11,14 +11,15 @@ from ..utils.file_utils import extract_text
 from ..utils.grading_gemini import grade_answer
 from fastapi.responses import FileResponse
 from .database import db
-from .google_drive import get_drive_service, FOLDER_IDS
-from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 from ..utils.file_utils import extract_text
 from ..utils.grading_gemini import grade_answer
 import io
 import logging
-from tenacity import retry, stop_after_attempt, wait_exponential
 import aiofiles
+import mimetypes
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
+
 
 logger = logging.getLogger(__name__)
 UPLOAD_DIR = "local_uploads"
@@ -26,80 +27,50 @@ ALLOWED_EXTENSIONS = {"pdf", "txt"}  # Allowed file types
 
 router = APIRouter()
 
-
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-def upload_to_drive(drive_service, file_metadata, media):
-    return drive_service.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields='id'
-    ).execute()
-
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-def download_from_drive(drive_service, file_id):
-    request = drive_service.files().get_media(fileId=file_id)
-    file_io = io.BytesIO()
-    downloader = MediaIoBaseDownload(file_io, request)
-    done = False
-    while not done:
-        status, done = downloader.next_chunk()
-    file_io.seek(0)
-    return file_io
-
-
-
-@router.get("/content/{content_id}")
-async def get_content_by_id(content_id: str):
-    try:        
-        content = db["content"].find_one({"content_id": content_id})
-        
-        if not content:
-            raise HTTPException(status_code=404, detail="Content not found")
-            
-        # Convert ObjectId to string if present
-        if "_id" in content:
-            content["_id"] = str(content["_id"])
-        
-        # Format the response to match what the frontend expects
-        response = {
-            "content_id": content["content_id"],
-            "content_name": content.get("content_name", "Untitled"),
-            "description": content.get("description", ""),
-            "file_path": content.get("content_file_path", "")
-        }
-            
-        return response
-    except Exception as e:
-        print(f"Error retrieving content metadata: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
-
 @router.get("/content/file/{content_id}")
 async def serve_content_file(content_id: str):
+    """
+    Serves a content file by trusting the absolute path stored in the database.
+    This logic is identical to the proven serve_assignment_file function.
+    """
     try:
+        # 1. Find the content document in the database
         content = db["content"].find_one({"content_id": content_id})
-        
         if not content:
-            raise HTTPException(status_code=404, detail="Content not found")
+            raise HTTPException(status_code=404, detail="Content metadata not found in the database.")
 
+        # 2. Get the file path directly from the database record
         file_path = content.get("content_file_path")
-        print(f"File path: {file_path}")
 
-        if not file_path or not os.path.exists(file_path):
-            raise HTTPException(status_code=404, detail="File not found")
+        # 3. Critically validate the path and file existence
+        if not file_path:
+            raise HTTPException(status_code=404, detail="The database record is missing a file path.")
 
-        ext = os.path.splitext(file_path)[1].lower()
-        media_type = "application/pdf" if ext == ".pdf" else "text/plain" if ext == ".txt" else "application/octet-stream"
+        # This is the most important check. It uses the exact path from the DB.
+        if not os.path.exists(file_path):
+            # We log this for clear debugging. Check your server console for this message.
+            print(f"[ERROR] CRITICAL: File does not exist at the path from the database: {file_path}")
+            raise HTTPException(status_code=404, detail=f"File not found on the server's disk.")
 
-        print(f"Serving file: {file_path}, Media type: {media_type}")
+        # 4. Determine media type and serve the file
+        media_type, _ = mimetypes.guess_type(file_path)
+        if media_type is None:
+            media_type = "application/octet-stream"
+
         return FileResponse(
             path=file_path,
             media_type=media_type,
             filename=os.path.basename(file_path),
-            headers={"Content-Disposition": f"inline; filename={os.path.basename(file_path)}"}
         )
+
+    except HTTPException:
+        # Let FastAPI handle its own exceptions by re-raising them
+        raise
     except Exception as e:
-        print(f"Unexpected error: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        # Catch any other unexpected crash and log it
+        print(f"[CRITICAL ERROR] An unexpected exception occurred in serve_content_file: {e}")
+        raise HTTPException(status_code=500, detail="A critical internal error occurred while processing the file.")
+    
     
 @router.get("/assignment/file/{assignment_id}")
 async def serve_assignment_file(assignment_id: str):
@@ -160,7 +131,7 @@ async def get_assignment(assignment_id: str):
         assignment_response = AssignmentViewResponse(
             assignment_id=assignment.get("assignment_id"),
             assignment_name=assignment.get("assignment_name"),
-            assignment_file_id=assignment.get("assignment_file_id"),
+            assignment_file_path=assignment.get("assignment_file_path"),
             Deadline=assignment.get("deadline"),
             class_id=assignment.get("class_id"),
             subject_id=assignment.get("subject_id"),
@@ -246,7 +217,7 @@ async def get_content(student_id: str, subject_id: str):
             content_response = ContentResponse(
                 content_id=content.get("content_id"),
                 content_name=content.get("content_name"),
-                content_file_id=content.get("content_file_id"),
+                content_file_path=content.get("content_file_path"),
                 Date=upload_date,
                 description=content.get("description"),
                 class_id=content.get("class_id"),
@@ -522,9 +493,6 @@ async def submit_assignment(student_id: str, assignment_id: str, file: UploadFil
         if os.path.exists(file_path):
             os.remove(file_path)
         raise HTTPException(status_code=500, detail=f"Failed to submit assignment: {str(e)}")
-
-
-
 
 
 # update content status (mark as done)

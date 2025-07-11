@@ -6,11 +6,8 @@ from typing import List
 from openai import BaseModel
 from ..models.academic import StudentResponse,AssignmentResponse, ClassResponse, ContentUploadResponse, StudentsResponse,SubjectClassResponse, SubjectResponse, SubjectWithClasses,SubmissionResponse
 from .database import db
-from .google_drive import get_drive_service, FOLDER_IDS
-from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 import io
 import logging
-from tenacity import retry, stop_after_attempt, wait_exponential
 import os
 import aiofiles
 from fastapi.responses import FileResponse
@@ -40,14 +37,17 @@ async def get_submission_file(submission_id: str):
         if not file_path or not os.path.exists(file_path):
             raise HTTPException(status_code=404, detail="File not found on the server for this submission.")
         
-        file_name = os.path.basename(file_path)
         
+        ext = os.path.splitext(file_path)[1].lower()
+        media_type = "application/pdf" if ext == ".pdf" else "text/plain" if ext == ".txt" else "application/octet-stream"
+
+
         # Return file from local path using FileResponse
         return FileResponse(
             path=file_path,
-            filename=file_name,
-            media_type='application/octet-stream', # Browser will handle based on extension
-            headers={"Content-Disposition": f"inline; filename=\"{file_name}\""}
+            media_type=media_type,
+            filename=os.path.basename(file_path),
+            headers={"Content-Disposition": f"inline; filename=\"{os.path.basename(file_path)}"}
         )
         
     except Exception as e:

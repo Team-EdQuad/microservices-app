@@ -51,7 +51,7 @@ class SubmissionResponse(BaseModel):
     submission_id: str
     subject_id: str
     subject_name: Optional[str] = None  
-    content_file_id: str
+    content_file_path: str
     submit_time_date: datetime
     class_id: str
     class_name: Optional[str] = None
@@ -90,7 +90,7 @@ class AssignmentResponse(BaseModel):
     assignment_name: str
     description: str
     deadline: datetime
-    assignment_file_id: str
+    assignment_file_path: str
     class_id: str
     subject_id: str
     teacher_id: str
@@ -112,7 +112,7 @@ class AssignmentMarksResponse(BaseModel):
 class ContentUploadResponse(BaseModel):
     content_id: str
     content_name: str
-    content_file_id: str
+    content_file_path: str
     upload_date: str
     description: str
     class_id: str
@@ -120,12 +120,12 @@ class ContentUploadResponse(BaseModel):
 
 class Exam(BaseModel):
     exam_id: str
-    term: int  # Term as an integer (e.g., 1, 2, 3)
+    term: int  
     marks: float
 
 class SubjectExams(BaseModel):
     subject_id: str
-    subject_name: Optional[str] = None  # This will be fetched from DB
+    subject_name: Optional[str] = None  
     exams: List[Exam]
 
 class ExamMarksResponse(BaseModel):

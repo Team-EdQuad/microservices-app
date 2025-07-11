@@ -3,7 +3,6 @@ import os
 import uuid
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from typing import List
-
 from ..utils.grading_gemini import grade_answer
 from ..utils.grading_deepseek import grade_answer_deepseek
 from ..models.academic import StatusUpdateRequest,AssignmentListResponse, AssignmentViewResponse, ContentResponse, MarksResponse, SubjectResponse,AssignmentMarksResponse, SubmissionResponse
@@ -19,9 +18,10 @@ from ..utils.grading_gemini import grade_answer
 import io
 import logging
 from tenacity import retry, stop_after_attempt, wait_exponential
-
+import aiofiles
 
 logger = logging.getLogger(__name__)
+UPLOAD_DIR = "local_uploads"
 ALLOWED_EXTENSIONS = {"pdf", "txt"}  # Allowed file types
 
 router = APIRouter()
@@ -419,6 +419,7 @@ async def get_exam_marks(student_id: str):
 
     return marks_responses
 
+
 @router.post("/submission/{student_id}/{assignment_id}", response_model=SubmissionResponse)
 async def submit_assignment(student_id: str, assignment_id: str, file: UploadFile = File(...)):
     # Validate file extension
@@ -426,11 +427,12 @@ async def submit_assignment(student_id: str, assignment_id: str, file: UploadFil
     if file_extension not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=400, detail="Only PDF and TXT files are allowed.")
 
-    # Fetch assignment details from MongoDB
+    # Fetch assignment details
     assignment = db["assignment"].find_one({"assignment_id": assignment_id})
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
 
+    # Get necessary details from assignment
     subject_id = assignment.get("subject_id")
     teacher_id = assignment.get("teacher_id")
     class_id = assignment.get("class_id")
@@ -438,50 +440,46 @@ async def submit_assignment(student_id: str, assignment_id: str, file: UploadFil
     sample_answer = assignment.get("sample_answer")
     assignment_name = assignment.get("assignment_name", "Unnamed Assignment")
 
-    # Fetch class name
+    # Fetch related names for the record
     class_doc = db["class"].find_one({"class_id": class_id})
     class_name = class_doc.get("class_name", "Unknown Class") if class_doc else "Unknown Class"
-
-    # Fetch subject name
     subject_doc = db["subject"].find_one({"subject_id": subject_id})
     subject_name = subject_doc.get("subject_name", "Unknown Subject") if subject_doc else "Unknown Subject"
 
-    # Determine collection based on grading type
+    # Determine collection and check for existing submission
     collection_name = "grading_submissions" if grading_type == "auto" else "submission"
-    
-    # Check if a submission already exists for the same student and assignment
     existing_submission = db[collection_name].find_one({"student_id": student_id, "assignment_id": assignment_id})
+    
     submission_id = existing_submission.get("submission_id") if existing_submission else f"SUBM{uuid.uuid4().hex[:6].upper()}"
+
+    # Define local file path and save the file
+    submissions_path = os.path.join(UPLOAD_DIR, "submissions")
+    os.makedirs(submissions_path, exist_ok=True)
     
-    content = await file.read()
+    file_path = os.path.join(submissions_path, f"{submission_id}_{file.filename}")
+
     try:
-        drive_service = get_drive_service()
-        file_metadata = {
-            'name': f"{submission_id}_{file.filename}",
-            'parents': [FOLDER_IDS["submissions"]],
-            'mimeType': file.content_type
-        }
-        media = MediaIoBaseUpload(io.BytesIO(content), mimetype=file.content_type)
-        file_response = upload_to_drive(drive_service, file_metadata, media)
-        google_drive_file_id = file_response.get('id')
-    
-        # AI Auto-Grading (if grading_type is 'auto')
+        content = await file.read()
+        async with aiofiles.open(file_path, 'wb') as out_file:
+            await out_file.write(content)
+        
+        # AI Auto-Grading (if applicable)
         marks = None
         if grading_type == "auto" and sample_answer:
             try:
-                file_io = download_from_drive(drive_service, google_drive_file_id)
-                student_text = extract_text(file_io, file.filename)
+                # Use the in-memory content for text extraction, which is more efficient
+                student_text = extract_text(io.BytesIO(content), file.filename)
                 marks = grade_answer(sample_answer, student_text)
             except Exception as e:
                 logger.error(f"Auto-grading failed for submission_id={submission_id}: {str(e)}")
                 raise HTTPException(status_code=500, detail=f"Auto-grading failed: {str(e)}")
         
-        # Submission record
+        # Prepare the submission record with the local file path
         submission_data = {
             "submission_id": submission_id,
             "subject_id": subject_id,
             "subject_name": subject_name,
-            "content_file_id": google_drive_file_id,
+            "content_file_path": file_path,  # Store the local path
             "submit_time_date": datetime.utcnow().isoformat(),
             "class_id": class_id,
             "class_name": class_name,
@@ -493,7 +491,6 @@ async def submit_assignment(student_id: str, assignment_id: str, file: UploadFil
             "teacher_id": teacher_id,
         }
 
-        # Add additional fields for auto-graded submissions
         if grading_type == "auto":
             submission_data.update({
                 "grading_type": "auto",
@@ -501,26 +498,34 @@ async def submit_assignment(student_id: str, assignment_id: str, file: UploadFil
                 "sample_answer_used": sample_answer
             })
 
+        # Handle resubmission: delete old file and update record
         if existing_submission:
-            if existing_submission.get("content_file_id"):
+            old_file_path = existing_submission.get("content_file_path")
+            if old_file_path and os.path.exists(old_file_path):
                 try:
-                    drive_service.files().delete(fileId=existing_submission["content_file_id"]).execute()
-                except Exception as e:
-                    logger.warning(f"Failed to delete old file {existing_submission['content_file_id']}: {str(e)}")
-            # Update the existing submission in appropriate collection
+                    os.remove(old_file_path)
+                except OSError as e:
+                    logger.warning(f"Failed to delete old file {old_file_path}: {e}")
+            
             db[collection_name].update_one(
                 {"submission_id": submission_id},
                 {"$set": submission_data}
             )
         else:
-            # Insert a new submission in appropriate collection
+            # Insert a new record
             db[collection_name].insert_one(submission_data)
             
         return SubmissionResponse(**submission_data)
         
     except Exception as e:
         logger.error(f"[ERROR] Submitting submission_id={submission_id} -> {str(e)}")
+        # Clean up the newly created file if something went wrong
+        if os.path.exists(file_path):
+            os.remove(file_path)
         raise HTTPException(status_code=500, detail=f"Failed to submit assignment: {str(e)}")
+
+
+
 
 
 # update content status (mark as done)

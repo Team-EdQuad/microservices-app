@@ -10,11 +10,15 @@ from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 import io
 import logging
 from tenacity import retry, stop_after_attempt, wait_exponential
+import os
+import aiofiles
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 ALLOWED_EXTENSIONS = {"pdf", "txt", "mp3", "mp4"}  # Allowed file types
+UPLOAD_DIR = "local_uploads"
+
 
 router = APIRouter()
 
@@ -124,6 +128,7 @@ async def get_subjectNclass(teacher_id: str):
     return SubjectClassResponse(subjects_classes=result)
 
 
+#assignment create
 @router.post("/assignmentcreate/{class_id}/{subject_id}/{teacher_id}", response_model=AssignmentResponse)
 async def create_assignment(
     class_id: str,
@@ -131,50 +136,40 @@ async def create_assignment(
     teacher_id: str,
     assignment_name: str = Form(...),
     description: str = Form(...),
-    deadline: str = Form(...),  # ISO format string
+    deadline: str = Form(...),
     grading_type: str = Form(...),
     sample_answer: str = Form(None),
     file: UploadFile = File(...)
 ):
-    #  Validate grading type
     if grading_type == "auto" and not sample_answer:
         raise HTTPException(status_code=400, detail="Sample answer is required for auto grading.")
 
-    # Generate ID
     assignment_id = f"ASM{uuid.uuid4().hex[:6].upper()}"
-    content = await file.read()
+
+    # Define the local file path
+    assignments_path = os.path.join(UPLOAD_DIR, "assignments")
+    os.makedirs(assignments_path, exist_ok=True)  # Create directory if it doesn't exist
+    
+    file_extension = file.filename.split('.')[-1]
+    file_path = os.path.join(assignments_path, f"{assignment_id}.{file_extension}")
 
     try:
-        # Initialize Google Drive service
-        drive_service = get_drive_service()
-
-        # Upload to Assignments subfolder
-        file_metadata = {
-            'name': f"{assignment_id}_{file.filename}",
-            'parents': [FOLDER_IDS["assignments"]],
-            'mimeType': file.content_type
-        }
-        media = MediaIoBaseUpload(io.BytesIO(content), mimetype=file.content_type)
-        file_response = upload_to_drive(drive_service, file_metadata, media)
-        google_drive_file_id = file_response.get('id')
+        # Save the file locally asynchronously
+        async with aiofiles.open(file_path, 'wb') as out_file:
+            content = await file.read()
+            await out_file.write(content)
   
-
-        # Convert deadline safely
         try:
             deadline_dt = datetime.fromisoformat(deadline)
         except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid deadline format. Use ISO format (e.g., 2025-04-30T23:59:00)")
+            raise HTTPException(status_code=400, detail="Invalid deadline format. Use ISO format.")
 
-        # Get current UTC time for upload timestamp
-        created_at = datetime.utcnow()
-
-        # Insert data
         assignment_data = {
             "assignment_id": assignment_id,
             "assignment_name": assignment_name,
             "description": description,
             "deadline": deadline_dt,
-            "assignment_file_id": google_drive_file_id,
+            "assignment_file_path": file_path,  # Store the local file path
             "class_id": class_id,
             "subject_id": subject_id,
             "teacher_id": teacher_id,
@@ -184,13 +179,16 @@ async def create_assignment(
         }
 
         db["assignment"].insert_one(assignment_data)
-        return AssignmentResponse(**assignment_data)
+        
+        # You may need to adjust your AssignmentResponse model to expect 'assignment_file_path'
+        return assignment_data
 
     except Exception as e:
         logger.error(f"[ERROR] Creating assignment_id={assignment_id} -> {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to create assignment: {str(e)}")
-    
-#upload content
+
+
+#upload content# 
 @router.post("/contentupload/{class_id}/{subject_id}", response_model=ContentUploadResponse)
 async def upload_content(
     class_id: str,
@@ -199,48 +197,43 @@ async def upload_content(
     content_name: str = Form(...),
     description: str = Form(...),
 ):
-    # Validate file extension
     file_extension = file.filename.split(".")[-1].lower()
     if file_extension not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=400, detail="Only PDF, TXT, MP3, and MP4 files are allowed.")
 
-    # Generate unique content ID
     content_id = f"CNT{uuid.uuid4().hex[:3].upper()}"
-    content = await file.read()
     
+    # Define the local file path
+    content_path = os.path.join(UPLOAD_DIR, "content")
+    os.makedirs(content_path, exist_ok=True) # Create directory if it doesn't exist
+    
+    file_path = os.path.join(content_path, f"{content_id}_{file.filename}")
+
     try:
-        # Initialize Google Drive service
-        drive_service = get_drive_service()
+        # Save the file locally asynchronously
+        async with aiofiles.open(file_path, 'wb') as out_file:
+            content = await file.read()
+            await out_file.write(content)
 
-        # Upload to Content subfolder
-        file_metadata = {
-            'name': f"{content_id}_{file.filename}",
-            'parents': [FOLDER_IDS["content"]],
-            'mimeType': file.content_type
-        }
-        media = MediaIoBaseUpload(io.BytesIO(content), mimetype=file.content_type)
-        file_response = upload_to_drive(drive_service, file_metadata, media)
-        google_drive_file_id = file_response.get('id')
-
-        # Content record
         content_data = {
             "content_id": content_id,
             "content_name": content_name,
-            "content_file_id": google_drive_file_id,
+            "content_file_path": file_path, # Store the local file path
             "upload_date": datetime.utcnow().strftime("%Y-%m-%d"),
             "description": description,
             "class_id": class_id,
             "subject_id": subject_id
         }
 
-        # Insert into MongoDB
         db["content"].insert_one(content_data)
-        return ContentUploadResponse(**content_data)
+        
+        # Adjust your ContentUploadResponse model to expect 'content_file_path'
+        return content_data
 
     except Exception as e:
         logger.error(f"[ERROR] Uploading content_id={content_id} -> {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to upload content: {str(e)}")
-      
+    
 
 #view submission ( teacher )
 @router.get("/submission_view/{teacher_id}", response_model=List[SubmissionResponse])

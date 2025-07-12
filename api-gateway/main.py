@@ -40,7 +40,7 @@ from services.usermanagement import delete_user, get_recent_users_from_user_mana
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/user-management/login")
 
 
-from services.academic import  view_auto_graded_submissions_request,review_auto_graded_marks_request,get_student_list_by_class_and_subject,get_submission_file_by_id,get_assignment_file_by_id,get_content_by_id,get_content_file_by_id,create_assignment_request,upload_content_request,view_ungraded_manual_submissions,update_manual_marks,add_exam_marks_request,get_subject_names,get_student_content,get_all_assignments,get_assignment_by_id,get_assignment_marks,get_exam_marks, upload_assignment_file ,mark_content_done,get_subject_and_class_for_teacher
+from services.academic import  get_content_file_by_id,view_auto_graded_submissions_request,review_auto_graded_marks_request,get_student_list_by_class_and_subject,get_submission_file_by_id,get_assignment_file_by_id,create_assignment_request,upload_content_request,view_ungraded_manual_submissions,update_manual_marks,add_exam_marks_request,get_subject_names,get_student_content,get_all_assignments,get_assignment_by_id,get_assignment_marks,get_exam_marks, upload_assignment_file ,mark_content_done,get_subject_and_class_for_teacher
 from services.behavioural import update_collection_active_time,call_prediction_service,model_train,Visualize_data_list,time_spent_on_resources,average_active_time,resource_access_frequency,content_access_start,content_access_close
 
 from services.attendance import attendanceRouter
@@ -209,10 +209,6 @@ async def add_sport(sport: dict):
     return await create_sport(sport)
 
 # Academic
-@app.get("/api/content/{content_id}")
-async def get_content_file(content_id: str):
-    return await get_content_by_id(content_id)
-
 @app.get("/api/content/file/{content_id}")
 async def get_content_file(content_id: str):
     return await get_content_file_by_id(content_id)
@@ -324,7 +320,27 @@ async def upload_content(
     return await upload_content_request(class_id, subject_id, content_name, description, file)
 
 
-@app.get("/api/submission_view/{teacher_id}", response_model=List)
+
+class SubmissionResponse(BaseModel):
+    submission_id: str
+    subject_id: str
+    subject_name: Optional[str] = None  
+    content_file_path: str
+    submit_time_date: datetime
+    class_id: str
+    class_name: Optional[str] = None
+    file_name: str
+    marks: Optional[int] = None
+    assignment_id: str
+    assignment_name: Optional[str] = None 
+    student_id: str
+    teacher_id: str
+
+class CategorizedSubmissionsResponse(BaseModel):
+    on_time_submissions: List[SubmissionResponse]
+    late_submissions: List[SubmissionResponse]
+
+@app.get("/api/submission_view/{teacher_id}", response_model=CategorizedSubmissionsResponse)
 async def get_manual_submissions(teacher_id: str):
     return await view_ungraded_manual_submissions(teacher_id)
 
@@ -361,7 +377,7 @@ async def update_exam_marks(
 
     return await add_exam_marks_request(form_data)
 
-@app.get("/api/auto_graded_submissions/{teacher_id}")
+@app.get("/api/auto_graded_submissions/{teacher_id}",response_model=CategorizedSubmissionsResponse)
 async def get_auto_graded_submissions(teacher_id: str):
     return await view_auto_graded_submissions_request(teacher_id)
 

@@ -10,7 +10,7 @@ class SubjectResponse(BaseModel):
 class ContentResponse(BaseModel):
     content_id: str
     content_name: str
-    content_file_id: Optional[str] = None  # Optional field
+    content_file_path: Optional[str] = None  # Optional field
     Date: Optional[datetime] = None
     description: Optional[str] = None
     class_id: str
@@ -51,7 +51,7 @@ class SubmissionResponse(BaseModel):
     submission_id: str
     subject_id: str
     subject_name: Optional[str] = None  
-    content_file_id: str
+    content_file_path: str
     submit_time_date: datetime
     class_id: str
     class_name: Optional[str] = None
@@ -77,7 +77,7 @@ class AssignmentListResponse(BaseModel):
 class AssignmentViewResponse(BaseModel):
     assignment_id: str
     assignment_name: str
-    assignment_file_id : str
+    assignment_file_path : str
     Deadline: datetime
     class_id: str
     subject_id: str
@@ -90,7 +90,7 @@ class AssignmentResponse(BaseModel):
     assignment_name: str
     description: str
     deadline: datetime
-    assignment_file_id: str
+    assignment_file_path: str
     class_id: str
     subject_id: str
     teacher_id: str
@@ -112,20 +112,20 @@ class AssignmentMarksResponse(BaseModel):
 class ContentUploadResponse(BaseModel):
     content_id: str
     content_name: str
-    content_file_id: str
-    upload_date: str
+    content_file_path: str
+    upload_date: datetime
     description: str
     class_id: str
     subject_id: str
 
 class Exam(BaseModel):
     exam_id: str
-    term: int  # Term as an integer (e.g., 1, 2, 3)
+    term: int  
     marks: float
 
 class SubjectExams(BaseModel):
     subject_id: str
-    subject_name: Optional[str] = None  # This will be fetched from DB
+    subject_name: Optional[str] = None  
     exams: List[Exam]
 
 class ExamMarksResponse(BaseModel):

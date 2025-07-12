@@ -6,7 +6,7 @@ import os
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
 SERVICE_ACCOUNT_FILE = os.path.join(os.path.dirname(__file__), "edquad-23435052a937.json")
 FOLDER_IDS = {
-    "content": "1fG5t_kaG9QRmPtiNJ40wsvBplp9nIT-u",
+    "content": "1OFRASPSsndJEDCLaywsDiXo-Jbb9_YWt",
     "assignments": "1IwE3pQF9TgGPf-0vg7WrPShgEkCcshcr", 
     "submissions": "1Yb31vqo2VlwXavh8SWTZuOBLSQu5_vIC"}
 

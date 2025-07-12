@@ -113,7 +113,7 @@ class ContentUploadResponse(BaseModel):
     content_id: str
     content_name: str
     content_file_path: str
-    upload_date: str
+    upload_date: datetime
     description: str
     class_id: str
     subject_id: str

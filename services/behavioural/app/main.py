@@ -422,6 +422,7 @@ async def close_content_access(request_data: Dict):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
+
 @router.post(
     "/update_weekly_data/{subject_id}/{class_id}",
     response_model=UpdateResponse
@@ -437,32 +438,16 @@ async def update_weekly_data(subject_id: str, class_id: str):
         # --- 2. Compute this week's UTC range (Mon 00:00 → next Mon 00:00) ---
         week_start, week_end = get_current_week_range()
 
-        # --- 3. Check if we've already inserted **real** data for THIS week ---
-        real_filter = {
-            "subject_id": subject_id,
-            "class_id": class_id,
-            "WeekStartDate": week_start,
-            "WeekEndDate": week_end,
-            "data": "1"
-        }
-        real_entry = pred_coll.find_one(real_filter)
-
-        if real_entry:
-            # A real row already exists this week—reuse its Weeknumber
-            current_week_number = real_entry["Weeknumber"]
-        else:
-            # First real call this week → bump from the last synthetic week
-            last_synth = pred_coll.find_one(
-                {
-                    "subject_id": subject_id,
-                    "class_id": class_id,
-                    # exclude any real data
-                    "data": {"$ne": "1"}
-                },
-                sort=[("Weeknumber", -1)]
-            )
-            last_week = last_synth["Weeknumber"] if last_synth else 0
-            current_week_number = last_week + 1
+        # --- 3. Always get the next week number from the highest existing week number ---
+        last_record = pred_coll.find_one(
+            {
+                "subject_id": subject_id,
+                "class_id": class_id,
+            },
+            sort=[("Weeknumber", -1)]
+        )
+        last_week = last_record["Weeknumber"] if last_record else 0
+        current_week_number = last_week + 1
 
         logger.info(f"Using Weeknumber={current_week_number} for real data "
                     f"(range {week_start} → {week_end})")
@@ -512,7 +497,7 @@ async def update_weekly_data(subject_id: str, class_id: str):
         c_res = list(cont_coll.aggregate(c_pipeline))
         resources_uploaded = c_res[0]["cnt"] if c_res else 0
 
-        # --- 7. Build the upsert document ---
+        # --- 7. Build the insert document ---
         doc = {
             "Weeknumber": current_week_number,
             "TotalActiveTime": total_active,
@@ -525,19 +510,15 @@ async def update_weekly_data(subject_id: str, class_id: str):
             "data": "1"
         }
 
-        # --- 8. Upsert it (create or update the same week) ---
-        pred_coll.update_one(
-            real_filter,        # matches existing real row or creates new one
-            {"$set": doc},
-            upsert=True
-        )
-
+        # --- 8. Insert new record (always create a new entry) ---
+        result = pred_coll.insert_one(doc)
+        
         # Remove any internal _id before returning
         doc.pop("_id", None)
 
         return UpdateResponse(
             success=True,
-            message="Real weekly data upserted successfully.",
+            message="Real weekly data inserted successfully.",
             subject_id=subject_id,
             class_id=class_id,
             updated_week=current_week_number,
@@ -545,13 +526,11 @@ async def update_weekly_data(subject_id: str, class_id: str):
         )
 
     except Exception as e:
-        logger.exception(f"Error upserting real weekly data for {subject_id}/{class_id}")
+        logger.exception(f"Error inserting real weekly data for {subject_id}/{class_id}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}"
         )
-
-
 
 app.include_router(router)
 app.include_router(predict_router, tags=["Endpoints prediction "])

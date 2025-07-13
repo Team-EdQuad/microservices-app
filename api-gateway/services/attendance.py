@@ -369,7 +369,8 @@ async def forward_get_attendance_prediction(
     subject_id: str = Query("all"),
     start_date: str = Query("2023-01-01"),
     end_date: str = Query("2023-01-30"),
-    current_date: str = Query(datetime.now().strftime("%Y-%m-%d"))
+    # current_date: str = Query(datetime.now().strftime("%Y-%m-%d"))
+     today_date: str = Query(datetime.now().strftime("%Y-%m-%d"))
 ):
     try:
         async with httpx.AsyncClient() as client:
@@ -380,8 +381,8 @@ async def forward_get_attendance_prediction(
                     "subject_id": subject_id,
                     "start_date": start_date,
                     "end_date": end_date,
-                    "current_date": current_date,
-                }
+                    # "current_date": current_date,
+                    "today_date": today_date,                }
             )
         return JSONResponse(content=response.json(), status_code=response.status_code)
     except Exception as e:

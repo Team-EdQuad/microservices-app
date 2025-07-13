@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field
 from datetime import date
 from typing import List, Optional, Union
+from datetime import datetime
 
 class SubjectClass(BaseModel):
     subject_id: str
@@ -15,8 +16,8 @@ class TeacherModel(BaseModel):
     last_name: str
     gender: Optional[str]
     phone: Optional[str]  # Note: must match the key you pass
-    join_date: str
-    last_edit_date: str
+    join_date: Optional[Union[date, datetime]]
+    last_edit_date: Optional[Union[date, datetime]]
     subjects_classes: List[SubjectClass]
     role: str
 
@@ -40,8 +41,8 @@ class TeacherCreate(BaseModel):
     full_name: str
     gender: str
     Phone_no: str
-    join_date: date
-    last_edit_date: date
+    join_date: Optional[Union[date, datetime, str]] = None
+    last_edit_date: Optional[Union[date, datetime, str]] = None
     subjects_classes: List[SubjectClass]
     role: str = "teacher"
 

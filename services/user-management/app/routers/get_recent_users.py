@@ -36,5 +36,9 @@ async def get_recent_users_by_role(role: str, limit: int = 5) -> List[Dict]:
             "id": str(user_doc.get(user_id_field, str(user_doc.get("_id")))), # Use custom ID or MongoDB _id as fallback
             "name": user_doc.get(user_name_field, "N/A"), # Use full_name or "N/A" if not found
             "role": role_lower, # Include role for clarity, though not strictly needed by frontend table
+            "phone": user_doc.get("phone_no") or user_doc.get("phone", "N/A"),
+            "role": role_lower,
+            "email": user_doc.get("email", "N/A"),
+            
         })
     return recent_users

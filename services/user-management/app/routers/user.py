@@ -18,9 +18,12 @@ async def get_user_profile(current_user: AdminModel = Depends(get_current_user))
             "student_id": current_user.student_id,
             "full_name": current_user.full_name,
             "email": current_user.email,
+            "gender": current_user.gender,
             "class_id": current_user.class_id,
             "subjects": current_user.subject,
-            "phone": current_user.phone
+            "phone": current_user.phone,
+            "join_date": current_user.join_date,
+            "last_edit_date": current_user.last_edit_date,
         }
     elif current_user.role == "teacher":
         profile_data = {
@@ -30,7 +33,10 @@ async def get_user_profile(current_user: AdminModel = Depends(get_current_user))
             "email": current_user.email,
             "gender": current_user.gender,
             "subjects_classes": current_user.subjects_classes,
-            "phone": current_user.phone
+            "phone": current_user.phone,
+            "join_date": current_user.join_date,
+            "last_edit_date": current_user.last_edit_date,
+            
         }
     else:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: Unknown role")

@@ -187,12 +187,11 @@ async def detect_login_anomaly_api(
 
         # Trigger anomaly detection logic
         result = detect_login_anomaly_logic(data=data, db_client=db_client)
-
         return result
     except Exception as e:
         logger.error(f"Error during anomaly detection: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error during anomaly detection process")
-# --- END ANOMALY DETECTION ENDPOINT ---
+# --- END NEW ANOMALY DETECTION ENDPOINT ---
 
 # Health check endpoint
 @app.get("/health")
@@ -201,6 +200,8 @@ async def health_check():
     return {"status": "healthy", "message": "User Management API is running"}
 
 # Profile endpoint with enhanced error handling
+from datetime import date, datetime
+
 @app.get("/profile")
 async def get_profile(current_user=Depends(get_current_user)):
     """Get full user profile with normalized user_id and full_name"""
@@ -228,12 +229,39 @@ async def get_profile(current_user=Depends(get_current_user)):
             last = getattr(current_user, "last_name", "").strip()
             full_name = f"{first} {last}".strip()
 
-        # Convert the full model to dict
+        # Convert Pydantic model to dict first
         user_dict = current_user.dict()
 
         # Override normalized fields
         user_dict["user_id"] = user_id
         user_dict["full_name"] = full_name
+
+        # Serialize dates in user_dict
+        def serialize_dates(data: dict):
+            for key in ["join_date", "last_edit_date"]:
+                val = data.get(key)
+                if isinstance(val, (date, datetime)):
+                    data[key] = val.isoformat()
+            return data
+
+        user_dict = serialize_dates(user_dict)
+
+        # Optional: format date strings to 'YYYY-MM-DD' for UI friendliness
+        def format_date(value):
+            if isinstance(value, (datetime, date)):
+                return value.strftime("%Y-%m-%d")
+            elif isinstance(value, str):
+                try:
+                    return datetime.fromisoformat(value).strftime("%Y-%m-%d")
+                except Exception:
+                    return value  # fallback if not ISO
+            return "-"
+
+        # Format dates (uncomment if you want formatted dates in response)
+        user_dict["join_date"] = format_date(user_dict.get("join_date"))
+        user_dict["last_edit_date"] = format_date(user_dict.get("last_edit_date"))
+
+        print(f"Returning profile data: {user_dict}")
 
         return user_dict
 
@@ -242,6 +270,7 @@ async def get_profile(current_user=Depends(get_current_user)):
     except Exception as e:
         logger.error(f"Profile error: {str(e)}")
         raise HTTPException(status_code=500, detail="Error retrieving profile")
+
 
 # Root endpoint
 @app.get("/")

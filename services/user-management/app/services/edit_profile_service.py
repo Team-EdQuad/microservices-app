@@ -59,7 +59,7 @@ async def update_user_profile(role: str, user_id: str, profile_update: UserProfi
         "gender": profile_update.gender,
         "language": profile_update.language,
         "email": profile_update.email,
-        "phone": profile_update.phone,
+        "phone_no": profile_update.phone, 
         "role": profile_update.role,
         "join_date": profile_update.joined_date,
         "last_edit_date": datetime.utcnow().isoformat()

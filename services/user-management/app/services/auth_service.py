@@ -18,16 +18,34 @@ ALGORITHM = "HS256"
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")  # matches your login endpoint
 
-def parse_date(value: Optional[Union[str, datetime, date]]) -> Optional[datetime]:
-    if value is None:
+# def parse_date(value: Optional[Union[str, datetime, date]]) -> Optional[datetime]:
+#     if value is None:
+#         return None
+#     if isinstance(value, (datetime, date)):
+#         return value
+#     try:
+#         return parse(value)
+#     except Exception:
+#         return None
+
+def parse_date(date_val: Optional[Union[str, date, datetime]]) -> Optional[Union[date, datetime]]:
+    """Parses a date string (YYYY-MM-DD or ISO format) into a date or datetime object."""
+    if date_val is None:
         return None
-    if isinstance(value, (datetime, date)):
-        return value
-    try:
-        return parse(value)
-    except Exception:
-        return None
-    
+    if isinstance(date_val, (date, datetime)): # Already parsed, return as is
+        return date_val
+    if isinstance(date_val, str):
+        try:
+            # Attempt to parse as full ISO format first (for cases with time)
+            return datetime.fromisoformat(date_val)
+        except ValueError:
+            try:
+                # Then try parsing as YYYY-MM-DD date
+                return datetime.strptime(date_val, "%Y-%m-%d").date() # Return as date object if no time
+            except ValueError:
+                print(f"WARNING: Could not parse date string: {date_val}")
+                return None
+    return None # Fallback for unexpected types
     
 # Function to hash passwords
 def hash_password(password: str) -> str:
@@ -102,6 +120,12 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
             return AdminModel(**user_doc)
 
         elif role == "teacher":
+            # Parse dates once from the raw document strings
+            join_date_parsed = parse_date(user_doc.get("join_date"))
+            last_edit_parsed = parse_date(user_doc.get("last_edit_date"))
+
+            user_doc["join_date"] = join_date_parsed
+            user_doc["last_edit_date"] = last_edit_parsed
             # Optionally transform teacher_doc if needed (e.g. rename phone_no to phone)
             teacher_data = {
                 "teacher_id": user_doc.get("teacher_id"),
@@ -111,12 +135,13 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
                 "last_name": user_doc.get("last_name"),
                 "gender": user_doc.get("gender"),
                 "phone": user_doc.get("Phone_no"),  # normalize key here
-                "join_date": user_doc.get("join_date"),
-                "last_edit_date": user_doc.get("last_edit_date"),
+                "join_date": join_date_parsed,      # Use the already parsed date object
+                "last_edit_date": last_edit_parsed,  # Parse here
                 "subjects_classes": user_doc.get("subjects_classes", []),
                 "role": "teacher"
 
             }
+            print(f"DEBUG: teacher_data sent to TeacherModel: {teacher_data}") # Add this for debugging
             return TeacherModel(**teacher_data)
 
     except jwt.JWTError:

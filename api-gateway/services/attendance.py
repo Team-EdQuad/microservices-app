@@ -362,3 +362,30 @@ async def forward_get_all_nonacadamic_subjects():
             content={"detail": f"Gateway error: {str(e)}"}
         )
 
+# get attendance prediction
+@attendanceRouter.get("/attendance/summary", summary="Forward attendance prediction request")
+async def forward_get_attendance_prediction(
+    class_id: str = Query("all"),
+    subject_id: str = Query("all"),
+    start_date: str = Query("2023-01-01"),
+    end_date: str = Query("2023-01-30"),
+    current_date: str = Query(datetime.now().strftime("%Y-%m-%d"))
+):
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{ATTENDANCE_SERVICE_URL}/attendance/summary",
+                params={
+                    "class_id": class_id,
+                    "subject_id": subject_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "current_date": current_date,
+                }
+            )
+        return JSONResponse(content=response.json(), status_code=response.status_code)
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"Gateway error: {str(e)}"}
+        )

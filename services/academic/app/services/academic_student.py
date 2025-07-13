@@ -4,7 +4,6 @@ import uuid
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from typing import List
 from ..utils.grading_gemini import grade_answer
-from ..utils.grading_deepseek import grade_answer_deepseek
 from ..models.academic import StatusUpdateRequest,AssignmentListResponse, AssignmentViewResponse, ContentResponse, MarksResponse, SubjectResponse,AssignmentMarksResponse, SubmissionResponse
 from .database import db
 from ..utils.file_utils import extract_text

@@ -15,7 +15,7 @@ db = client.LMS
 
 attendance_store = db["attendance_store"] 
 # attendance_store = db["attendance_store_test"] 
-student = db["student_test"]
+student = db["student"]
 class_attendance_summery = db["class_attendance_summery_test"]
 # class_attendance_summery = db["class_attendance_summery"]
 student_attendance_summery = db["student_attendance_summery_test"]

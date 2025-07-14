@@ -291,3 +291,27 @@ async def get_weekly_attendance(class_id: str = "CLS001", year: int = datetime.n
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving attendance data: {str(e)}")
+
+@admin_dashboard_router.get("/admin-access-profile")
+async def get_admin_access_profile(user_id: str = Query(..., description="User ID")):
+    user = None
+
+    if user_id.startswith("STU"):
+        user = student_table.find_one({"student_id": user_id})
+    elif user_id.startswith("TCH"):
+        user = teacher_table.find_one({"teacher_id": user_id})
+    elif user_id.startswith("ADM"):
+        user = admin_table.find_one({"admin_id": user_id})
+    else:
+        raise HTTPException(status_code=400, detail="Invalid user ID prefix")
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Convert MongoDB ObjectId to string if needed
+    user["_id"] = str(user["_id"])
+
+    # You may want to remove sensitive info like password here before returning
+    user.pop("password", None)
+
+    return user

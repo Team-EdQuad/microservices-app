@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Dict
 from ..services.background_services.get_daily_attendance_service import get_attendance_summary
+from typing import Optional
 
 router = APIRouter(
     tags=["Attendance"],
@@ -14,7 +15,7 @@ class AttendanceSummaryResponse(BaseModel):
     start_date: str
     end_date: str
     avg: float
-    exist_avg: float
+    exist_avg: Optional[float]
     exist: Dict[str, float]
     predict: Dict[str, float]
 

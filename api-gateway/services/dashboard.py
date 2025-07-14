@@ -1,6 +1,8 @@
 import httpx
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
+from fastapi import Query
+
 
 
 DASHBOARD_SERVICE_URL = "http://127.0.0.1:8006"
@@ -99,7 +101,7 @@ async def get_model_feedback(student_id: str, class_id: str):
 #-----------------Teacher Dashboard Routes------------------
 async def get_teacher_assignments(teacher_id: str):
     try:
-        timeout = httpx.Timeout(20.0, connect=10.0)
+        timeout = httpx.Timeout(30.0, connect=10.0)
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.get(f"{DASHBOARD_SERVICE_URL}/teacher/{teacher_id}/assignments")
             response.raise_for_status()
@@ -115,7 +117,8 @@ async def get_all_Classes():
         return response.json()
 
 async def get_exam_marks_teacher(class_id: str, exam_year: str):
-    async with httpx.AsyncClient() as client:
+    timeout = httpx.Timeout(20.0, connect=10.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.get(f"{DASHBOARD_SERVICE_URL}/teacher/{class_id}/{exam_year}/exam-marks")
         response.raise_for_status()
         return response.json()
@@ -131,7 +134,8 @@ async def get_student_progress_teacher(class_id: str, year:int =None):
         return response.json()
 
 async def get_weekly_attendance(class_id: str, year: int, week_num: int):
-    async with httpx.AsyncClient() as client:
+    timeout = httpx.Timeout(20.0, connect=10.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
         # Pass query parameters in the URL
         response = await client.get(
             f"{DASHBOARD_SERVICE_URL}/teacher/weekly_attendance",
@@ -172,33 +176,47 @@ async def get_all_users(search_with_id: str = None, role: str = None, class_id: 
         params["role"] = role
     if class_id:
         params["class_id"] = class_id
-
-    async with httpx.AsyncClient() as client:
+    timeout = httpx.Timeout(20.0, connect=10.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.get(f"{DASHBOARD_SERVICE_URL}/admin/user_data", params=params)
+        response.raise_for_status()
+        return response.json()
+    
+async def forward_admin_access_profile(user_id: str = Query(...)):
+    timeout = httpx.Timeout(20.0, connect=10.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        response = await client.get(
+            f"{DASHBOARD_SERVICE_URL}/admin/admin-access-profile",
+            params={"user_id": user_id}
+        )
         response.raise_for_status()
         return response.json()
 
 async def get_stats():
-    async with httpx.AsyncClient() as client:
+    timeout = httpx.Timeout(20.0, connect=10.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.get(f"{DASHBOARD_SERVICE_URL}/admin/stats")
         response.raise_for_status()
         return response.json()
     
 async def get_exam_marks_admin(class_id: str, exam_year: str):
-    async with httpx.AsyncClient() as client:
+    timeout = httpx.Timeout(20.0, connect=10.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.get(f"{DASHBOARD_SERVICE_URL}/admin/{class_id}/{exam_year}/exam-marks")
         response.raise_for_status()
         return response.json()
 
 
 async def get_student_progress_admin(class_id: str):
-    async with httpx.AsyncClient() as client:
+    timeout = httpx.Timeout(20.0, connect=10.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.get(f"{DASHBOARD_SERVICE_URL}/admin/{class_id}/student_progress")
         response.raise_for_status()
         return response.json()
 
 async def get_weekly_attendance_admin(class_id: str, year: int, week_num: int):
-    async with httpx.AsyncClient() as client:
+    timeout = httpx.Timeout(20.0, connect=10.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
         # Pass query parameters in the URL
         response = await client.get(
             f"{DASHBOARD_SERVICE_URL}/admin/weekly_attendance",

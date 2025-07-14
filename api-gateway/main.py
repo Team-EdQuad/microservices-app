@@ -28,7 +28,7 @@ from fastapi import FastAPI, HTTPException, APIRouter, Body, UploadFile, File, F
 from services.nonacademic import get_all_sports, create_sport, get_all_clubs, create_club, filter_sports
 from services.dashboard import get_student_progress, get_student_assignments,filter_assignments,sort_assignments, get_student_attendance,get_student_exam_marks,monthly_attendance, current_weekly_attendance,non_academic_attendance,engagement_score, model_features,get_model_feedback
 from services.dashboard import get_teacher_assignments, get_exam_marks_teacher, get_student_progress_teacher, get_weekly_attendance,get_all_Classes,get_low_attendance_students,get_low_attendance_students_count
-from services.dashboard import get_exam_marks_admin,  get_student_progress_admin, get_weekly_attendance_admin, get_stats, get_all_users
+from services.dashboard import get_exam_marks_admin,  get_student_progress_admin, get_weekly_attendance_admin, get_stats, get_all_users,forward_admin_access_profile
 
 from services.usermanagement import login_user, add_admin, add_student, add_teacher, delete_user,edit_profile, update_password, get_profile, serialize_dates,logout_user,fetch_anomaly_results
 
@@ -207,6 +207,10 @@ async def fetch_all_sports():
 @app.post("/api/nonacademic/sports", response_model=dict)
 async def add_sport(sport: dict):
     return await create_sport(sport)
+
+@app.get("/api/nonacademic/clubs", response_model=list)
+async def fetch_all_clubs():
+    return await get_all_clubs()
 
 # Academic
 @app.get("/api/content/file/{content_id}")
@@ -619,6 +623,15 @@ async def users(search_with_id: str = None, role: str = None, class_id: str = No
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
+@app.get("/api/admin/dashboard/admin-access-profile")
+async def admin_access_profile_endpoint(user_id: str = Query(...)):
+    try:
+        return await forward_admin_access_profile(user_id)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+
 @app.get("/api/admin/dashboard/stats")
 async def stats():
     try:

@@ -24,6 +24,17 @@ class AttendanceEntry(BaseModel):
     date: str
     status: Dict[str, str]  # e.g., {"std001": "present", "std002": "absent"}
 
+class CalendarEventFeatures(BaseModel):
+    is_exam_week: int
+    is_event_day: int
+    is_school_day: int
+
+class CalendarEventRequest(BaseModel):
+    class_id: str
+    subject_id: str
+    date: str
+    features: CalendarEventFeatures
+
 # get class students
 @attendanceRouter.post("/attendance/students/by-class")
 async def forward_get_class_students(request_data: StudentsOfClassRequest):
@@ -419,3 +430,19 @@ async def forward_store_calendar_event(request: Request):
             status_code=500,
             content={"detail": f"Gateway internal error: {str(e)}"}
         )
+    
+
+@attendanceRouter.post("/attendance/store-calendar-events", status_code=201)
+async def proxy_calendar_event(event_data: CalendarEventRequest):
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{ATTENDANCE_SERVICE_URL}/attendance/store-calendar-event",
+                json=event_data.dict(),
+            )
+        return response.json()
+
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Attendance service unreachable: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

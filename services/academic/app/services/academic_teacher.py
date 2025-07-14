@@ -222,7 +222,7 @@ async def upload_content(
             "content_id": content_id,
             "content_name": content_name,
             "content_file_path": file_path, # Store the local file path
-            "upload_date": datetime.utcnow().isoformat() + "Z",
+            "upload_date": datetime.utcnow().date().isoformat(),
             "description": description,
             "class_id": class_id,
             "subject_id": subject_id

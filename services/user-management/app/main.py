@@ -8,6 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from jose import jwt
 import logging
+from datetime import datetime
 
 # --- NEW IMPORTS FOR ANOMALY DETECTION ---
 from app.anomaly_detection.workers.anomaly_detector import LoginInput, detect_login_anomaly_logic, retrain_models
@@ -16,6 +17,7 @@ from app.db.database import get_database # Import your MongoDB client
 # --- END NEW IMPORTS ---
 from app.routers import anomaly,get_recent_users
 from app.routers import user as user_router 
+from app.routers import update_student
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -164,6 +166,7 @@ app.include_router(update_password.router)
 app.include_router(anomaly.router)
 app.include_router(get_recent_users.router)
 app.include_router(user_router.router) 
+app.include_router(update_student.router)
 
 
 
@@ -252,4 +255,43 @@ async def root():
         "version": "1.0.0",
         "docs": "/docs",
         "health": "/health"
+
     }
+
+@app.get("/get-full-profile")
+async def get_full_profile(current_user=Depends(get_current_user)):
+    role = current_user.role.lower()
+
+    collection_map = {
+        "admin": "admin",
+        "teacher": "teacher",
+        "student": "student"
+    }
+    id_field_map = {
+        "admin": "admin_id",
+        "teacher": "teacher_id",
+        "student": "student_id"
+    }
+
+    collection = collection_map.get(role)
+    id_field = id_field_map.get(role)
+
+    if not collection or not id_field:
+        raise HTTPException(status_code=400, detail="Invalid role")
+
+    user_id = getattr(current_user, id_field, None)
+    if not user_id:
+        raise HTTPException(status_code=404, detail="User ID not found")
+    
+    db = get_database()
+    user_doc = await db[collection].find_one({id_field: user_id})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Normalize ObjectId and datetime fields
+    user_doc["_id"] = str(user_doc["_id"])
+    for date_field in ["join_date", "last_edit_date"]:
+        if date_field in user_doc and isinstance(user_doc[date_field], datetime):
+            user_doc[date_field] = user_doc[date_field].isoformat()
+
+    return user_doc

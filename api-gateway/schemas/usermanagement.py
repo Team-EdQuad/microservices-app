@@ -95,3 +95,18 @@ class UpdatePasswordRequest(BaseModel):
     email: str
     password: str
 
+class UpdateStudentModel(BaseModel):
+    student_id: str
+    first_name: str
+    last_name: str
+    gender: str
+    email: EmailStr
+    password: str
+    class_id: str
+    phone_no: str
+    subject_id: List[str]
+    join_date: str
+    last_edit_date: str
+    club_id: List[str]
+    sport_id: List[str]
+    role: str

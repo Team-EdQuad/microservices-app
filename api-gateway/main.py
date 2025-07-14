@@ -10,7 +10,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles 
-from fastapi import Query
+from fastapi import Query, Depends, Header
 from datetime import date
 import logging
 import traceback
@@ -30,9 +30,9 @@ from services.dashboard import get_student_progress, get_student_assignments,fil
 from services.dashboard import get_teacher_assignments, get_exam_marks_teacher, get_student_progress_teacher, get_weekly_attendance,get_all_Classes,get_low_attendance_students,get_low_attendance_students_count
 from services.dashboard import get_exam_marks_admin,  get_student_progress_admin, get_weekly_attendance_admin, get_stats, get_all_users,forward_admin_access_profile
 
-from services.usermanagement import login_user, add_admin, add_student, add_teacher, delete_user,edit_profile, update_password, get_profile, serialize_dates,logout_user,fetch_anomaly_results
+from services.usermanagement import login_user, add_admin, add_student, add_teacher, delete_user,edit_profile, update_password, get_profile, serialize_dates,logout_user,fetch_anomaly_results,update_student,proxy_get_student_data,proxy_get_full_profile
 
-from schemas.usermanagement import LoginRequest, AdminCreate,StudentRegistration,TeacherCreate, UserProfileUpdate, UpdatePasswordRequest
+from schemas.usermanagement import LoginRequest, AdminCreate,StudentRegistration,TeacherCreate, UserProfileUpdate, UpdatePasswordRequest,UpdateStudentModel
 from services.calendar import get_assignment_deadlines
 from services.usermanagement import delete_user, get_recent_users_from_user_management # <-- THIS LINE NEEDS TO INCLUDE IT
 
@@ -112,6 +112,18 @@ async def api_delete_user(role: str, user_custom_id: str, token: str = Depends(o
     authorization = f"Bearer {token}"
     return await delete_user(role, user_custom_id, authorization)
 
+@app.get("/api/user-management/get-student/{student_id}")
+async def api_get_student_data(student_id: str, request: Request):
+    # Just forward the whole request to proxy
+    return await proxy_get_student_data(student_id, request)
+
+@app.post("/api/user-management/update-student/")
+async def gateway_update_student(
+    student_data: UpdateStudentModel,
+    authorization: Optional[str] = Header(None)
+):
+    return await update_student(student_data, authorization)
+
 # API Gateway endpoint for recent users
 @app.get("/api/user-management/recent-users/{role}")
 async def api_get_recent_users(role: str, token: str = Depends(oauth2_scheme)): # Assuming recent users also need auth
@@ -144,6 +156,12 @@ async def profile(token: str = Depends(oauth2_scheme)):
     profile_data = await get_profile(authorization=auth_header)
     print(f"Profile data response: {profile_data}")
     return profile_data
+
+@app.get("/api/user-management/get-full-profile")
+async def get_full_profile_proxy(request: Request, token: str = Depends(oauth2_scheme)):
+    auth_header = f"Bearer {token}"
+    return await proxy_get_full_profile(request, authorization=auth_header)
+
 
 @app.get("/api/anomaly-detection/results")
 async def api_get_anomaly_results(

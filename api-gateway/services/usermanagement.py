@@ -8,6 +8,7 @@ import shutil
 from fastapi.security import OAuth2PasswordBearer
 from typing import Optional
 from fastapi import Query
+from schemas.usermanagement import UpdateStudentModel
 
 
 
@@ -337,3 +338,54 @@ async def fetch_anomaly_results(
 #         # Log the exception to console or file for debugging
 #         print("Exception in anomaly results endpoint:", e)
 #         raise HTTPException(status_code=500, detail=str(e))
+
+# --- Update Student ---
+async def update_student(student_data: UpdateStudentModel, authorization: Optional[str] = None):
+    headers = {}
+    if authorization:
+        headers["Authorization"] = authorization
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{USER_MANAGEMENT_SERVICE_URL}/update-student",
+                json=student_data.dict(),
+                headers=headers
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        detail = exc.response.json().get("detail", "User service error")
+        raise HTTPException(status_code=exc.response.status_code, detail=detail)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+# --- Get Student Data ---
+async def proxy_get_student_data(student_id: str, request: Request):
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{USER_MANAGEMENT_SERVICE_URL}/get-student-data",
+                params={"student_id": student_id},
+                headers={"Authorization": request.headers.get("Authorization", "")}
+            )
+        return response.json()
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=500, detail=f"Error contacting user service: {str(e)}")
+    
+
+# --- Get profile page ---
+async def proxy_get_full_profile(request: Request, authorization: Optional[str] = None):
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{USER_MANAGEMENT_SERVICE_URL}/get-full-profile",
+                headers={"Authorization": authorization}  # use passed auth header
+            )
+        response.raise_for_status()
+        return response.json()
+    except httpx.HTTPStatusError as e:
+        # You may want to handle http errors here
+        return JSONResponse(status_code=e.response.status_code, content={"detail": e.response.text})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": str(e)})

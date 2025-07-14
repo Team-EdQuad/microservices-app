@@ -6,17 +6,29 @@ async def mark_class_attendance_service(class_id: str, subject_id: str, date: st
         date_obj = datetime.strptime(date, "%Y-%m-%d")
         weekday = date_obj.strftime("%A")
 
+        total_students = len(status)
+        present_students = sum(1 for s in status.values() if s.lower() == "present")
+
+        # Calculate to two decimal places
+        attendance_percentage = round((present_students / total_students) * 100, 2) if total_students > 0 else 0.0
+
         attendance_data = {
             "class_id": class_id,
             "subject_id": subject_id,
             "date": date,
             "weekday": weekday,
-            "status": status
+            "status": status,
+            "attendance_percentage": attendance_percentage
         }
 
         await attendance_store.insert_one(attendance_data)
 
-        return {"message": "Attendance record added successfully", "success": True}
+        return {
+            "message": "Attendance record added successfully",
+            "success": True,
+            "attendance_percentage": attendance_percentage
+        }
 
     except Exception as e:
         raise Exception(f"Failed to mark attendance: {str(e)}")
+

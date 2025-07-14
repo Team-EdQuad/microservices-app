@@ -62,9 +62,9 @@ async def get_class_students_service(class_id: str, subject_type: str, subject_i
         else:
             student_query = {"class_id": class_id}
             if subject_type == "sport":
-                student_query["sports"] = {"$in": [subject_id]}
+                student_query["sport_id"] = {"$in": [subject_id]}
             elif subject_type == "club":
-                student_query["clubs"] = {"$in": [subject_id]}
+                student_query["club_id"] = {"$in": [subject_id]}
 
             cursor = student.find(
                 student_query,

@@ -1,0 +1,13 @@
+9:21 PM
+git fetch <branch name>
+git merge dev
+git push -u origin <branch name>
+Shiny Fernando
+9:27 PM
+git merge origin/dev
+Shiny Fernando
+9:31 PM
+rm -rf node_modules package-lock.json
+Shiny Fernando
+9:32 PM
+npm install

@@ -1,5 +1,3 @@
-# Environment variables
-app/.env
 
 # Python cache files
 __pycache__/

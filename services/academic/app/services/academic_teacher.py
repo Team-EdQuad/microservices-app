@@ -3,30 +3,26 @@ import uuid
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from typing import List
+from openai import BaseModel
 from ..models.academic import StudentResponse,AssignmentResponse, ClassResponse, ContentUploadResponse, StudentsResponse,SubjectClassResponse, SubjectResponse, SubjectWithClasses,SubmissionResponse
 from .database import db
-from .google_drive import get_drive_service, FOLDER_IDS
-from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 import io
 import logging
-from tenacity import retry, stop_after_attempt, wait_exponential
+import os
+import aiofiles
+from fastapi.responses import FileResponse
 from dateutil.parser import isoparse
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 ALLOWED_EXTENSIONS = {"pdf", "txt", "mp3", "mp4"}  # Allowed file types
+UPLOAD_DIR = "local_uploads"
+
 
 router = APIRouter()
-
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-def upload_to_drive(drive_service, file_metadata, media):
-    return drive_service.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields='id'
-    ).execute()
-
 
 @router.get("/submission/file/{submission_id}")
 async def get_submission_file(submission_id: str):
@@ -39,34 +35,22 @@ async def get_submission_file(submission_id: str):
         if not submission:
             raise HTTPException(status_code=404, detail="Submission not found")
         
-        content_file_id = submission.get("content_file_id")
-        if not content_file_id:
-            raise HTTPException(status_code=404, detail="File not found for this submission")
+        # Get the LOCAL file path from the record
+        file_path = submission.get("content_file_path")
+        if not file_path or not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="File not found on the server for this submission.")
         
-        # Download file from Google Drive
-        drive_service = get_drive_service()
-        # Helper function to download file from Google Drive
-        def download_from_drive(service, file_id):
-            request = service.files().get_media(fileId=file_id)
-            file_io = io.BytesIO()
-            downloader = MediaIoBaseDownload(file_io, request)
-            done = False
-            while not done:
-                status, done = downloader.next_chunk()
-            file_io.seek(0)
-            return file_io
+        
+        ext = os.path.splitext(file_path)[1].lower()
+        media_type = "application/pdf" if ext == ".pdf" else "text/plain" if ext == ".txt" else "application/octet-stream"
 
-        file_io = download_from_drive(drive_service, content_file_id)
-        
-        # Get file metadata for content type
-        file_metadata = drive_service.files().get(fileId=content_file_id).execute()
-        content_type = file_metadata.get('mimeType', 'application/octet-stream')
-        
-        # Return file as streaming response
-        return StreamingResponse(
-            io.BytesIO(file_io.getvalue()),
-            media_type=content_type,
-            headers={"Content-Disposition": f"inline; filename={submission.get('file_name', 'file')}"}
+
+        # Return file from local path using FileResponse
+        return FileResponse(
+            path=file_path,
+            media_type=media_type,
+            filename=os.path.basename(file_path),
+            headers={"Content-Disposition": f"inline; filename=\"{os.path.basename(file_path)}"}
         )
         
     except Exception as e:
@@ -125,6 +109,7 @@ async def get_subjectNclass(teacher_id: str):
     return SubjectClassResponse(subjects_classes=result)
 
 
+#assignment create
 @router.post("/assignmentcreate/{class_id}/{subject_id}/{teacher_id}", response_model=AssignmentResponse)
 async def create_assignment(
     class_id: str,
@@ -132,52 +117,58 @@ async def create_assignment(
     teacher_id: str,
     assignment_name: str = Form(...),
     description: str = Form(...),
-    deadline: str = Form(...),  # ISO format string
+    deadline: str = Form(...),
     grading_type: str = Form(...),
     sample_answer: str = Form(None),
     file: UploadFile = File(...)
 ):
-    #  Validate grading type
     if grading_type == "auto" and not sample_answer:
         raise HTTPException(status_code=400, detail="Sample answer is required for auto grading.")
 
-    # Generate ID
     assignment_id = f"ASM{uuid.uuid4().hex[:6].upper()}"
-    content = await file.read()
+    # content = await file.read()
+
+    # try:
+    #     # Initialize Google Drive service
+    #     drive_service = get_drive_service()
+
+    #     # Upload to Assignments subfolder
+    #     file_metadata = {
+    #         'name': f"{assignment_id}_{file.filename}",
+    #         'parents': [FOLDER_IDS["assignments"]],
+    #         'mimeType': file.content_type
+    #     }
+    #     media = MediaIoBaseUpload(io.BytesIO(content), mimetype=file.content_type)
+    #     file_response = upload_to_drive(drive_service, file_metadata, media)
+    #     google_drive_file_id = file_response.get('id')
+
+    # Define the local file path
+    assignments_path = os.path.join(UPLOAD_DIR, "assignments")
+    os.makedirs(assignments_path, exist_ok=True)  # Create directory if it doesn't exist
+    
+    file_extension = file.filename.split('.')[-1]
+    file_path = os.path.join(assignments_path, f"{assignment_id}.{file_extension}")
 
     try:
-        # Initialize Google Drive service
-        drive_service = get_drive_service()
+        # Save the file locally asynchronously
+        async with aiofiles.open(file_path, 'wb') as out_file:
+            content = await file.read()
+            await out_file.write(content)
 
-        # Upload to Assignments subfolder
-        file_metadata = {
-            'name': f"{assignment_id}_{file.filename}",
-            'parents': [FOLDER_IDS["assignments"]],
-            'mimeType': file.content_type
-        }
-        media = MediaIoBaseUpload(io.BytesIO(content), mimetype=file.content_type)
-        file_response = upload_to_drive(drive_service, file_metadata, media)
-        google_drive_file_id = file_response.get('id')
-  
-
-        # Convert deadline safely
+        # Convert deadline safely/
         try:
             # deadline_dt = datetime.fromisoformat(deadline)
             deadline_dt = isoparse(deadline)
 
         except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid deadline format. Use ISO format (e.g., 2025-04-30T23:59:00)")
+            raise HTTPException(status_code=400, detail="Invalid deadline format. Use ISO format.")
 
-        # Get current UTC time for upload timestamp
-        created_at = datetime.utcnow()
-
-        # Insert data
         assignment_data = {
             "assignment_id": assignment_id,
             "assignment_name": assignment_name,
             "description": description,
             "deadline": deadline_dt,
-            "assignment_file_id": google_drive_file_id,
+            "assignment_file_path": file_path,  # Store the local file path
             "class_id": class_id,
             "subject_id": subject_id,
             "teacher_id": teacher_id,
@@ -187,7 +178,9 @@ async def create_assignment(
         }
 
         db["assignment"].insert_one(assignment_data)
-        return AssignmentResponse(**assignment_data)
+        
+        # You may need to adjust your AssignmentResponse model to expect 'assignment_file_path'
+        return assignment_data
 
     except Exception as e:
         import traceback
@@ -196,7 +189,8 @@ async def create_assignment(
         print(f"[ERROR] Creating assignment_id={assignment_id} -> {str(e)}\n{tb}")  # Add this line temporarily
         print(tb)
         raise HTTPException(status_code=500, detail=f"Failed to create assignment: {str(e)}")
-    
+
+
 #upload content
 @router.post("/contentupload/{class_id}/{subject_id}", response_model=ContentUploadResponse)
 async def upload_content(
@@ -206,51 +200,50 @@ async def upload_content(
     content_name: str = Form(...),
     description: str = Form(...),
 ):
-    # Validate file extension
     file_extension = file.filename.split(".")[-1].lower()
     if file_extension not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=400, detail="Only PDF, TXT, MP3, and MP4 files are allowed.")
 
-    # Generate unique content ID
     content_id = f"CNT{uuid.uuid4().hex[:3].upper()}"
-    content = await file.read()
     
+    # Define the local file path
+    content_path = os.path.join(UPLOAD_DIR, "content")
+    os.makedirs(content_path, exist_ok=True) # Create directory if it doesn't exist
+    
+    file_path = os.path.join(content_path, f"{content_id}_{file.filename}")
+
     try:
-        # Initialize Google Drive service
-        drive_service = get_drive_service()
+        # Save the file locally asynchronously
+        async with aiofiles.open(file_path, 'wb') as out_file:
+            content = await file.read()
+            await out_file.write(content)
 
-        # Upload to Content subfolder
-        file_metadata = {
-            'name': f"{content_id}_{file.filename}",
-            'parents': [FOLDER_IDS["content"]],
-            'mimeType': file.content_type
-        }
-        media = MediaIoBaseUpload(io.BytesIO(content), mimetype=file.content_type)
-        file_response = upload_to_drive(drive_service, file_metadata, media)
-        google_drive_file_id = file_response.get('id')
-
-        # Content record
         content_data = {
             "content_id": content_id,
             "content_name": content_name,
-            "content_file_id": google_drive_file_id,
-            "upload_date": datetime.utcnow().strftime("%Y-%m-%d"),
+            "content_file_path": file_path, # Store the local file path
+            "upload_date": datetime.utcnow().isoformat() + "Z",
             "description": description,
             "class_id": class_id,
             "subject_id": subject_id
         }
 
-        # Insert into MongoDB
         db["content"].insert_one(content_data)
+        
+        # Adjust your ContentUploadResponse model to expect 'content_file_path'
         return ContentUploadResponse(**content_data)
 
     except Exception as e:
         logger.error(f"[ERROR] Uploading content_id={content_id} -> {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to upload content: {str(e)}")
-      
+    
 
-#view submission ( teacher )
-@router.get("/submission_view/{teacher_id}", response_model=List[SubmissionResponse])
+
+class CategorizedSubmissionsResponse(BaseModel):
+    on_time_submissions: List[SubmissionResponse]
+    late_submissions: List[SubmissionResponse]
+
+@router.get("/submission_view/{teacher_id}", response_model=CategorizedSubmissionsResponse)
 async def view_manual_submission(teacher_id: str):
     teacher_data = db["teacher"].find_one({"teacher_id": teacher_id})
     if not teacher_data:
@@ -260,7 +253,6 @@ async def view_manual_submission(teacher_id: str):
     if not subjects_classes:
         raise HTTPException(status_code=404, detail="No subjects or classes found for this teacher")
 
-    # Build a list of subject-class combinations
     filters = []
     for item in subjects_classes:
         subject_id = item.get("subject_id")
@@ -276,22 +268,53 @@ async def view_manual_submission(teacher_id: str):
                 ]
             })
 
-    # Collect matching submissions
-    manual_submissions = []
+    on_time = []
+    late = []
+
     for f in filters:
         submissions_cursor = db["submission"].find(f)
         for submission in submissions_cursor:
-            # Optionally add assignment name
-            assignment = db["assignment"].find_one({"assignment_id": submission["assignment_id"]})
-            if assignment:
-                submission["assignment_name"] = assignment.get("assignment_name")
-            manual_submissions.append(submission)
+            assignment = db["assignment"].find_one(
+                {"assignment_id": submission["assignment_id"]},
+                {"assignment_name": 1, "deadline": 1, "_id": 0}
+            )
 
-    if not manual_submissions:
-        raise HTTPException(status_code=404, detail="No manual submissions found")
+            submission["assignment_name"] = assignment.get("assignment_name") if assignment else None
+            deadline = assignment.get("deadline") if assignment else None
 
-    return [SubmissionResponse(**submission) for submission in manual_submissions]
+            # Add class_name and subject_name
+            class_doc = db["class"].find_one(
+                {"class_id": submission["class_id"]}, {"class_name": 1, "_id": 0}
+            )
+            subject_doc = db["subject"].find_one(
+                {"subject_id": submission["subject_id"]}, {"subject_name": 1, "_id": 0}
+            )
 
+            submission["class_name"] = class_doc.get("class_name") if class_doc else None
+            submission["subject_name"] = subject_doc.get("subject_name") if subject_doc else None
+
+            # Convert submit_time and deadline to datetime
+            submit_time = submission.get("submit_time_date")
+            if isinstance(submit_time, str):
+                submit_time = datetime.fromisoformat(submit_time)
+
+            if isinstance(deadline, str):
+                deadline = datetime.fromisoformat(deadline)
+
+            response = SubmissionResponse(**submission)
+
+            if deadline and submit_time and submit_time > deadline:
+                late.append(response)
+            else:
+                on_time.append(response)
+
+    if not on_time and not late:
+        raise HTTPException(status_code=404, detail="No submissions found")
+
+    return CategorizedSubmissionsResponse(
+        on_time_submissions=on_time,
+        late_submissions=late
+    )
 
 @router.post("/update_submission_marks/{teacher_id}", response_model=SubmissionResponse)
 async def update_submission_marks(
@@ -445,7 +468,7 @@ async def get_students_by_class_and_subject(class_id: str, subject_id: str):
 
 
 
-@router.get("/auto_graded_submissions/{teacher_id}", response_model=List[SubmissionResponse])
+@router.get("/auto_graded_submissions/{teacher_id}", response_model=CategorizedSubmissionsResponse)
 async def view_auto_graded_submissions(teacher_id: str):
     teacher_data = db["teacher"].find_one({"teacher_id": teacher_id})
     if not teacher_data:
@@ -455,7 +478,6 @@ async def view_auto_graded_submissions(teacher_id: str):
     if not subjects_classes:
         raise HTTPException(status_code=404, detail="No subjects or classes found for this teacher")
 
-    # Build a list of subject-class combinations
     filters = []
     for item in subjects_classes:
         subject_id = item.get("subject_id")
@@ -465,24 +487,56 @@ async def view_auto_graded_submissions(teacher_id: str):
                 "teacher_id": teacher_id,
                 "subject_id": subject_id,
                 "class_id": cls_id,
-                "grading_type": "auto"  # Only fetch auto-graded submissions
+                "grading_type": "auto"
             })
 
-    # Collect matching auto-graded submissions
-    auto_graded_submissions = []
+    on_time = []
+    late = []
+
     for f in filters:
         submissions_cursor = db["grading_submissions"].find(f)
         for submission in submissions_cursor:
-            # Add assignment name
-            assignment = db["assignment"].find_one({"assignment_id": submission["assignment_id"]})
-            if assignment:
-                submission["assignment_name"] = assignment.get("assignment_name")
-            auto_graded_submissions.append(submission)
+            # Get assignment info
+            assignment = db["assignment"].find_one(
+                {"assignment_id": submission["assignment_id"]},
+                {"assignment_name": 1, "deadline": 1, "_id": 0}
+            )
+            submission["assignment_name"] = assignment.get("assignment_name") if assignment else None
+            deadline = assignment.get("deadline") if assignment else None
 
-    if not auto_graded_submissions:
-        raise HTTPException(status_code=404, detail="No auto-graded submissions found for review")
+            # Add class and subject names
+            class_doc = db["class"].find_one({"class_id": submission["class_id"]}, {"class_name": 1})
+            subject_doc = db["subject"].find_one({"subject_id": submission["subject_id"]}, {"subject_name": 1})
 
-    return [SubmissionResponse(**submission) for submission in auto_graded_submissions]
+            submission["class_name"] = class_doc.get("class_name") if class_doc else None
+            submission["subject_name"] = subject_doc.get("subject_name") if subject_doc else None
+
+            # Ensure submit_time_date is datetime
+            submit_time = submission.get("submit_time_date")
+            if isinstance(submit_time, str):
+                submit_time = datetime.fromisoformat(submit_time)
+
+            if isinstance(deadline, str):
+                deadline = datetime.fromisoformat(deadline)
+
+            submission["submit_time_date"] = submit_time  # for model parsing
+
+            # Convert to Pydantic model
+            try:
+                response_model = SubmissionResponse(**submission)
+                if deadline and submit_time and submit_time > deadline:
+                    late.append(response_model)
+                else:
+                    on_time.append(response_model)
+            except Exception as e:
+                print(f"Skipping invalid submission: {e}")
+                continue
+
+    return CategorizedSubmissionsResponse(
+        on_time_submissions=on_time,
+        late_submissions=late
+    )
+
 
 
 @router.post("/review_auto_graded_marks/{teacher_id}", response_model=SubmissionResponse)

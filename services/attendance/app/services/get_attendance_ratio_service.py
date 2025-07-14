@@ -297,15 +297,20 @@ async def calculate_attendance_ratio(subject_id: str, summary_type: str, class_i
         # Corrected student-level attendance ratio logic
         total_days = len(filtered_records)
         present_days = 0
+        t_days = 0
 
         for record in filtered_records:
             status_dict = record.get("status", {})
             student_status = status_dict.get(student_id, "").strip().lower()
             if student_status == "present":
                 present_days += 1
+                t_days += 1
+            elif student_status == "absent":
+                t_days += 1
             # If missing or not 'present', considered absent
 
-        ratio = round((present_days / total_days) * 100, 2)
+        ratio = round((present_days / t_days) * 100, 2)
+        print(f"present_days: {present_days}, total_days: {t_days}, ratio: {ratio}")
 
         result = {
             "subject_id": subject_id,

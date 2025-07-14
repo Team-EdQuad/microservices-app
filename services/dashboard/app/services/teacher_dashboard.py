@@ -144,38 +144,229 @@ async def get_class_exam_marks(class_id: str, exam_year: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving class exam marks: {str(e)}")
 
+# @teacher_dashboard_router.get("/{class_id}/student_progress", response_model=List[dict])
+# async def get_student_progress(class_id: str, year: int = None):
+#     try:
+#         if not year:
+#             year = datetime.now().year
+
+#         # class_details = class_table.find_one({"class_id": class_id})
+#         # if not class_details:
+#         #     raise HTTPException(status_code=404, detail="Class not found")
+
+#         all_students = list(student_table.find({"class_id": class_id}))
+#         academic_attendance = list(academic_attendance_table.find({"class_id": class_id}))
+
+#         if not all_students:
+#             raise HTTPException(status_code=404, detail="No students found in this class")
+
+#         student_progress = []
+
+#         for student in all_students:
+#             student_id = student["student_id"]
+#             student_name = student.get("full_name", "Unknown")
+
+#             # --- Exam Averages ---
+#             first_term_total = second_term_total = third_term_total = 0
+#             term1_count = term2_count = term3_count = 0
+
+#             student_exam_marks = exam_table.find_one({
+#                 "student_id": student_id,
+#                 "class_id": class_id,
+#                 "exam_year": year
+#             })
+
+#             if student_exam_marks and student_exam_marks.get("exam_marks"):
+#                 for subject in student_exam_marks["exam_marks"]:
+#                     for exam in subject.get("exams", []):
+#                         term = exam.get("term")
+#                         marks = exam.get("marks", 0)
+
+#                         if term == 1:
+#                             first_term_total += marks
+#                             term1_count += 1
+#                         elif term == 2:
+#                             second_term_total += marks
+#                             term2_count += 1
+#                         elif term == 3:
+#                             third_term_total += marks
+#                             term3_count += 1
+
+#             first_term_avg = first_term_total / term1_count if term1_count else 0
+#             second_term_avg = second_term_total / term2_count if term2_count else 0
+#             third_term_avg = third_term_total / term3_count if term3_count else 0
+
+    
+#             # --- Academic Attendance ---
+#             total_days = 0
+#             present_days = 0
+
+#             for record in academic_attendance:
+#                 record_date = datetime.strptime(record["date"], "%Y-%m-%d")
+#                 if record_date.year == year and record['subject_id'] == "academic":
+#                     total_days += 1
+#                     if student_id in record["status"]:
+#                         if record["status"][student_id] == "present":
+#                             present_days += 1
+#             academic_attendance_rate = (present_days / total_days) * 100 if total_days else 0
+
+
+#             # --- Non- Academic Attendance ---
+#             total_days = 0
+#             present_days = 0
+
+#             for record in academic_attendance:
+#                 record_date = datetime.strptime(record["date"], "%Y-%m-%d")
+#                 if record_date.year == year and record['subject_id'] != "academic":
+#                     total_days += 1
+#                     if student_id in record["status"]:
+#                         if record["status"][student_id] == "present":
+#                             present_days += 1
+#             non_academic_attendance_rate = (present_days / total_days) * 100 if total_days else 0
+
+#             # --- Academic Progress ---
+#             avg_academic_progress = 0
+#             subject_ids = student.get("subject_id", [])
+#             if subject_ids:
+#                 progress_rate = 0
+#                 counted_subjects = 0
+
+#                 for subject_id in subject_ids:
+#                     total_contents = content_table.count_documents({
+#                         "subject_id": subject_id,
+#                         "class_id": class_id,
+#                         "upload_date": {"$regex": f"^{year}-"}
+#                     })
+
+#                     if total_contents == 0:
+#                         continue
+
+#                     completed_contents = 0
+#                     contents = content_table.find({
+#                         "subject_id": subject_id,
+#                         "class_id": class_id,
+#                         "upload_date": {"$regex": f"^{year}-"}
+#                     })
+
+#                     for content in contents:
+#                         content_id = content.get("content_id")
+#                         student_content = student_content_table.find_one({
+#                             "content_id": content_id,
+#                             "student_id": student_id,
+#                             "status": "Active",
+#                             "class_id": class_id,
+#                             "subject_id": subject_id
+#                         })
+#                         if student_content:
+#                             completed_contents += 1
+
+#                     progress_percentage = (completed_contents / total_contents) * 100
+#                     progress_rate += progress_percentage
+#                     counted_subjects += 1
+
+#                 avg_academic_progress = progress_rate / counted_subjects if counted_subjects else 0
+
+#             # --- Add Student Progress Entry ---
+#             student_progress.append({
+#                 "student_name": student_name,
+#                 "first_term_avg": round(first_term_avg, 2),
+#                 "second_term_avg": round(second_term_avg, 2),
+#                 "third_term_avg": round(third_term_avg, 2),
+#                 "academic_attendance_rate": round(academic_attendance_rate, 2),
+#                 "non_academic_attendance_rate": round(non_academic_attendance_rate,2),
+#                 "avg_academic_progress": round(avg_academic_progress, 2)
+#             })
+
+#         return student_progress
+
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"Error retrieving student progress: {str(e)}")
 @teacher_dashboard_router.get("/{class_id}/student_progress", response_model=List[dict])
 async def get_student_progress(class_id: str, year: int = None):
     try:
         if not year:
             year = datetime.now().year
 
-        # class_details = class_table.find_one({"class_id": class_id})
-        # if not class_details:
-        #     raise HTTPException(status_code=404, detail="Class not found")
-
         all_students = list(student_table.find({"class_id": class_id}))
-        academic_attendance = list(academic_attendance_table.find({"class_id": class_id}))
-
         if not all_students:
             raise HTTPException(status_code=404, detail="No students found in this class")
 
+        student_ids = [student["student_id"] for student in all_students]
+        student_lookup = {student["student_id"]: student for student in all_students}
+
+        all_exam_marks = list(exam_table.find({
+            "student_id": {"$in": student_ids},
+            "class_id": class_id,
+            "exam_year": year
+        }))
+        exam_marks_lookup = {exam["student_id"]: exam for exam in all_exam_marks}
+
+        start_date = f"{year}-01-01"
+        end_date = f"{year}-12-31"
+        
+        all_attendance = list(academic_attendance_table.find({
+            "class_id": class_id,
+            "date": {"$gte": start_date, "$lte": end_date}
+        }))
+
+        academic_attendance_data = {}
+        non_academic_attendance_data = {}
+        
+        for record in all_attendance:
+            is_academic = record.get('subject_id') == "academic"
+            target_dict = academic_attendance_data if is_academic else non_academic_attendance_data
+            
+            for student_id in student_ids:
+                if student_id not in target_dict:
+                    target_dict[student_id] = {"total": 0, "present": 0}
+                
+                target_dict[student_id]["total"] += 1
+                if student_id in record.get("status", {}) and record["status"][student_id] == "present":
+                    target_dict[student_id]["present"] += 1
+
+
+        all_subject_ids = set()
+        for student in all_students:
+            all_subject_ids.update(student.get("subject_id", []))
+
+
+        all_contents = list(content_table.find({
+            "subject_id": {"$in": list(all_subject_ids)},
+            "class_id": class_id,
+            "upload_date": {"$gte": start_date, "$lte": end_date}
+        }))
+
+        contents_by_subject = {}
+        content_ids = []
+        for content in all_contents:
+            subject_id = content["subject_id"]
+            if subject_id not in contents_by_subject:
+                contents_by_subject[subject_id] = []
+            contents_by_subject[subject_id].append(content)
+            content_ids.append(content["content_id"])
+
+        all_student_content = list(student_content_table.find({
+            "content_id": {"$in": content_ids},
+            "student_id": {"$in": student_ids},
+            "status": "Active",
+            "class_id": class_id
+        }))
+
+        student_content_lookup = {}
+        for sc in all_student_content:
+            key = f"{sc['student_id']}_{sc['content_id']}"
+            student_content_lookup[key] = True
+
         student_progress = []
 
-        for student in all_students:
-            student_id = student["student_id"]
+        for student_id in student_ids:
+            student = student_lookup[student_id]
             student_name = student.get("full_name", "Unknown")
 
-            # --- Exam Averages ---
             first_term_total = second_term_total = third_term_total = 0
             term1_count = term2_count = term3_count = 0
 
-            student_exam_marks = exam_table.find_one({
-                "student_id": student_id,
-                "class_id": class_id,
-                "exam_year": year
-            })
-
+            student_exam_marks = exam_marks_lookup.get(student_id)
             if student_exam_marks and student_exam_marks.get("exam_marks"):
                 for subject in student_exam_marks["exam_marks"]:
                     for exam in subject.get("exams", []):
@@ -196,35 +387,12 @@ async def get_student_progress(class_id: str, year: int = None):
             second_term_avg = second_term_total / term2_count if term2_count else 0
             third_term_avg = third_term_total / term3_count if term3_count else 0
 
-    
-            # --- Academic Attendance ---
-            total_days = 0
-            present_days = 0
+            academic_data = academic_attendance_data.get(student_id, {"total": 0, "present": 0})
+            academic_attendance_rate = (academic_data["present"] / academic_data["total"]) * 100 if academic_data["total"] else 0
 
-            for record in academic_attendance:
-                record_date = datetime.strptime(record["date"], "%Y-%m-%d")
-                if record_date.year == year and record['subject_id'] == "academic":
-                    total_days += 1
-                    if student_id in record["status"]:
-                        if record["status"][student_id] == "present":
-                            present_days += 1
-            academic_attendance_rate = (present_days / total_days) * 100 if total_days else 0
+            non_academic_data = non_academic_attendance_data.get(student_id, {"total": 0, "present": 0})
+            non_academic_attendance_rate = (non_academic_data["present"] / non_academic_data["total"]) * 100 if non_academic_data["total"] else 0
 
-
-            # --- Non- Academic Attendance ---
-            total_days = 0
-            present_days = 0
-
-            for record in academic_attendance:
-                record_date = datetime.strptime(record["date"], "%Y-%m-%d")
-                if record_date.year == year and record['subject_id'] != "academic":
-                    total_days += 1
-                    if student_id in record["status"]:
-                        if record["status"][student_id] == "present":
-                            present_days += 1
-            non_academic_attendance_rate = (present_days / total_days) * 100 if total_days else 0
-
-            # --- Academic Progress ---
             avg_academic_progress = 0
             subject_ids = student.get("subject_id", [])
             if subject_ids:
@@ -232,32 +400,17 @@ async def get_student_progress(class_id: str, year: int = None):
                 counted_subjects = 0
 
                 for subject_id in subject_ids:
-                    total_contents = content_table.count_documents({
-                        "subject_id": subject_id,
-                        "class_id": class_id,
-                        "upload_date": {"$regex": f"^{year}-"}
-                    })
-
+                    subject_contents = contents_by_subject.get(subject_id, [])
+                    total_contents = len(subject_contents)
+                    
                     if total_contents == 0:
                         continue
 
                     completed_contents = 0
-                    contents = content_table.find({
-                        "subject_id": subject_id,
-                        "class_id": class_id,
-                        "upload_date": {"$regex": f"^{year}-"}
-                    })
-
-                    for content in contents:
+                    for content in subject_contents:
                         content_id = content.get("content_id")
-                        student_content = student_content_table.find_one({
-                            "content_id": content_id,
-                            "student_id": student_id,
-                            "status": "Active",
-                            "class_id": class_id,
-                            "subject_id": subject_id
-                        })
-                        if student_content:
+                        key = f"{student_id}_{content_id}"
+                        if key in student_content_lookup:
                             completed_contents += 1
 
                     progress_percentage = (completed_contents / total_contents) * 100
@@ -266,14 +419,13 @@ async def get_student_progress(class_id: str, year: int = None):
 
                 avg_academic_progress = progress_rate / counted_subjects if counted_subjects else 0
 
-            # --- Add Student Progress Entry ---
             student_progress.append({
                 "student_name": student_name,
                 "first_term_avg": round(first_term_avg, 2),
                 "second_term_avg": round(second_term_avg, 2),
                 "third_term_avg": round(third_term_avg, 2),
                 "academic_attendance_rate": round(academic_attendance_rate, 2),
-                "non_academic_attendance_rate": round(non_academic_attendance_rate,2),
+                "non_academic_attendance_rate": round(non_academic_attendance_rate, 2),
                 "avg_academic_progress": round(avg_academic_progress, 2)
             })
 

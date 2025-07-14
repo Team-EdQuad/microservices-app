@@ -183,7 +183,8 @@ async def get_model_features(student_id: str, class_id: str):
 
 
        ## ----- LMS Login Frequency and Active Hours ----
-        records = student_login_table.find({"student_id": "STU001"})
+ 
+        records = student_login_table.find({"student_id": student_id})
         for r in records:
             print("Login:", r.get("loginTime"), "Logout:", r.get("logoutTime"))
 
@@ -234,6 +235,7 @@ async def get_model_features(student_id: str, class_id: str):
             "lms_active_avg_hrs": avg_duration_hrs,
             "resource_access_avg_hrs": resource_access_hrs
         }
+        print("Features for prediction:", features)
         
         df = pd.DataFrame([features])
         prediction = model.predict(df)[0]

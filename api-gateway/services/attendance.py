@@ -1,5 +1,5 @@
 import httpx
-from fastapi import APIRouter, Form, File, UploadFile, Query
+from fastapi import APIRouter, Form, File, UploadFile, Query, Request
 from datetime import datetime
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -24,6 +24,17 @@ class AttendanceEntry(BaseModel):
     subject_id: str
     date: str
     status: Dict[str, str]  # e.g., {"std001": "present", "std002": "absent"}
+
+class CalendarEventFeatures(BaseModel):
+    is_exam_week: int
+    is_event_day: int
+    is_school_day: int
+
+class CalendarEventRequest(BaseModel):
+    class_id: str
+    subject_id: str
+    date: str
+    features: CalendarEventFeatures
 
 # get class students
 @attendanceRouter.post("/attendance/students/by-class")
@@ -363,3 +374,76 @@ async def forward_get_all_nonacadamic_subjects():
             content={"detail": f"Gateway error: {str(e)}"}
         )
 
+# get attendance prediction
+@attendanceRouter.get("/attendance/summary", summary="Forward attendance prediction request")
+async def forward_get_attendance_prediction(
+    class_id: str = Query("all"),
+    subject_id: str = Query("all"),
+    start_date: str = Query("2023-01-01"),
+    end_date: str = Query("2023-01-30"),
+    # current_date: str = Query(datetime.now().strftime("%Y-%m-%d"))
+     today_date: str = Query(datetime.now().strftime("%Y-%m-%d"))
+):
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{ATTENDANCE_SERVICE_URL}/attendance/summary",
+                params={
+                    "class_id": class_id,
+                    "subject_id": subject_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    # "current_date": current_date,
+                    "today_date": today_date,                }
+            )
+        return JSONResponse(content=response.json(), status_code=response.status_code)
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"Gateway error: {str(e)}"}
+        )
+
+# Forward store calendar event request
+@attendanceRouter.post("/calendar/store-event", status_code=201)
+async def forward_store_calendar_event(request: Request):
+    """
+    API Gateway: Forwards POST request to store a calendar event.
+    """
+    try:
+        # Get the JSON body from the client
+        event_data = await request.json()
+        
+        # Forward the request to the calendar service
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{ATTENDANCE_SERVICE_URL}/calendar/store-event",
+                json=event_data
+            )
+        return JSONResponse(content=response.json(), status_code=response.status_code)
+        
+    except httpx.HTTPError as e:
+        return JSONResponse(
+            status_code=502,
+            content={"detail": f"HTTP error forwarding to calendar service: {str(e)}"}
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"Gateway internal error: {str(e)}"}
+        )
+    
+
+@attendanceRouter.post("/attendance/store-calendar-events", status_code=201)
+async def proxy_calendar_event(event_data: CalendarEventRequest):
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{ATTENDANCE_SERVICE_URL}/attendance/store-calendar-event",
+                json=event_data.dict(),
+            )
+        return response.json()
+
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Attendance service unreachable: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

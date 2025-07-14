@@ -8,7 +8,32 @@ import io
 ACADEMIC_SERVICE_URL = "http://academic:8000"
 
 
-    
+async def get_content_file_by_id(content_id: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{ACADEMIC_SERVICE_URL}/content/file/{content_id}"
+            print(f"Calling URL: {url}")
+            response = await client.get(url)
+            print(f"Response status: {response.status_code}")
+            response.raise_for_status()
+
+            content_type = response.headers.get("content-type", "application/octet-stream")
+            content_disposition = response.headers.get("content-disposition", "attachment")
+            filename = response.headers.get("filename", f"file-{content_id}")
+            #Use io.BytesIO for proper StreamingResponse
+            return StreamingResponse(
+                io.BytesIO(response.content),
+                media_type=content_type,
+                headers={"Content-Disposition": content_disposition}
+            )
+
+    except httpx.HTTPStatusError as exc:
+        print(f"[ERROR] HTTPStatusError: {exc.response.status_code} - {exc.response.text}")
+        raise HTTPException(status_code=exc.response.status_code, detail=f"HTTP error: {exc.response.text}")
+    except Exception as exc:
+        print(f"[ERROR] Exception: {str(exc)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(exc)}")
+     
 async def get_student_list_by_class_and_subject(class_id, subject_id):
     try:
         async with httpx.AsyncClient() as client:

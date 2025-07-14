@@ -13,10 +13,10 @@ services/*/venv/
 __pycache__/
 **/__pycache__/
 
-# Ignore environment files
-.env
-services/*/.env
-api-gateway/.env
+# # Ignore environment files
+# .env
+# services/*/.env
+# api-gateway/.env
 
 # Ignore Docker-related temporary files if any
 *.dockerfile

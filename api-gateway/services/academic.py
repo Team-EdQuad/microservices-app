@@ -4,6 +4,7 @@ from fastapi import HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 import io
 
+
 ACADEMIC_SERVICE_URL = "http://127.0.0.1:8002"  
 
 async def get_content_file_by_id(content_id: str):

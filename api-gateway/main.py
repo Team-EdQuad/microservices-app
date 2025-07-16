@@ -10,15 +10,12 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles 
-from fastapi import Query, Depends, Header
+from fastapi import Query
 from datetime import date
-import logging
-import traceback
+
 
 
 import json
-
-from pydantic import BaseModel
 # from services.attendance.app.utils import schemas as attModSchemas
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'services')))
@@ -26,13 +23,13 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'service
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, APIRouter, Body, UploadFile, File, Form
 from services.nonacademic import get_all_sports, create_sport, get_all_clubs, create_club, filter_sports
-from services.dashboard import get_student_progress, get_student_assignments,filter_assignments,sort_assignments, get_student_attendance,get_student_exam_marks,monthly_attendance, current_weekly_attendance,non_academic_attendance,engagement_score, model_features,get_model_feedback
-from services.dashboard import get_teacher_assignments, get_exam_marks_teacher, get_student_progress_teacher, get_weekly_attendance,get_all_Classes,get_low_attendance_students,get_low_attendance_students_count
-from services.dashboard import get_exam_marks_admin,  get_student_progress_admin, get_weekly_attendance_admin, get_stats, get_all_users,forward_admin_access_profile
+from services.dashboard import get_student_progress, get_student_assignments,filter_assignments,sort_assignments, get_student_attendance,get_student_exam_marks,monthly_attendance, current_weekly_attendance,non_academic_attendance,engagement_score
+from services.dashboard import get_teacher_assignments, get_exam_marks_teacher, get_student_progress_teacher, get_weekly_attendance,get_all_Classes
+from services.dashboard import get_exam_marks_admin,  get_student_progress_admin, get_weekly_attendance_admin, get_stats, get_all_users
 
-from services.usermanagement import login_user, add_admin, add_student, add_teacher, delete_user,edit_profile, update_password, get_profile, serialize_dates,logout_user,fetch_anomaly_results,update_student,proxy_get_student_data,proxy_get_full_profile
+from services.usermanagement import login_user, add_admin, add_student, add_teacher, delete_user,edit_profile, update_password, get_profile, serialize_dates,logout_user,fetch_anomaly_results
 
-from schemas.usermanagement import LoginRequest, AdminCreate,StudentRegistration,TeacherCreate, UserProfileUpdate, UpdatePasswordRequest,UpdateStudentModel
+from schemas.usermanagement import LoginRequest, AdminCreate,StudentRegistration,TeacherCreate, UserProfileUpdate, UpdatePasswordRequest
 from services.calendar import get_assignment_deadlines
 from services.usermanagement import delete_user, get_recent_users_from_user_management # <-- THIS LINE NEEDS TO INCLUDE IT
 
@@ -40,8 +37,8 @@ from services.usermanagement import delete_user, get_recent_users_from_user_mana
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/user-management/login")
 
 
-from services.academic import  get_content_file_by_id,view_auto_graded_submissions_request,review_auto_graded_marks_request,get_student_list_by_class_and_subject,get_submission_file_by_id,get_assignment_file_by_id,create_assignment_request,upload_content_request,view_ungraded_manual_submissions,update_manual_marks,add_exam_marks_request,get_subject_names,get_student_content,get_all_assignments,get_assignment_by_id,get_assignment_marks,get_exam_marks, upload_assignment_file ,mark_content_done,get_subject_and_class_for_teacher
-from services.behavioural import update_collection_active_time,call_prediction_service,model_train,Visualize_data_list,time_spent_on_resources,average_active_time,resource_access_frequency,content_access_start,content_access_close
+from services.academic import  view_auto_graded_submissions_request,review_auto_graded_marks_request,get_student_list_by_class_and_subject,get_submission_file_by_id,get_assignment_file_by_id,get_content_by_id,get_content_file_by_id,create_assignment_request,upload_content_request,view_ungraded_manual_submissions,update_manual_marks,add_exam_marks_request,get_subject_names,get_student_content,get_all_assignments,get_assignment_by_id,get_assignment_marks,get_exam_marks, upload_assignment_file ,mark_content_done,get_subject_and_class_for_teacher
+from services.behavioural import get_model_status,load_model,model_train,active_time_prediction,Visualize_data_list,time_spent_on_resources,average_active_time,resource_access_frequency,content_access_start,content_access_close
 
 from services.attendance import attendanceRouter
 
@@ -65,10 +62,14 @@ app.add_middleware(
 )
 
 # User-management
+# @app.post("/api/user-management/login/")
+# async def api_login(username: str = Form(...), password: str = Form(...)):
+#     credentials = {"username": username, "password": password}
+#     return await login_user(credentials)
 @app.post("/api/user-management/login/")
-async def api_login(username: str = Form(...), password: str = Form(...)):
+async def api_login(req: Request, username: str = Form(...), password: str = Form(...)):
     credentials = {"username": username, "password": password}
-    return await login_user(credentials)
+    return await login_user(req, credentials)  # ✅ Pass request
 
 @app.post("/api/user-management/logout")
 async def api_logout(
@@ -108,18 +109,6 @@ async def api_delete_user(role: str, user_custom_id: str, token: str = Depends(o
     authorization = f"Bearer {token}"
     return await delete_user(role, user_custom_id, authorization)
 
-@app.get("/api/user-management/get-student/{student_id}")
-async def api_get_student_data(student_id: str, request: Request):
-    # Just forward the whole request to proxy
-    return await proxy_get_student_data(student_id, request)
-
-@app.post("/api/user-management/update-student/")
-async def gateway_update_student(
-    student_data: UpdateStudentModel,
-    authorization: Optional[str] = Header(None)
-):
-    return await update_student(student_data, authorization)
-
 # API Gateway endpoint for recent users
 @app.get("/api/user-management/recent-users/{role}")
 async def api_get_recent_users(role: str, token: str = Depends(oauth2_scheme)): # Assuming recent users also need auth
@@ -152,12 +141,6 @@ async def profile(token: str = Depends(oauth2_scheme)):
     profile_data = await get_profile(authorization=auth_header)
     print(f"Profile data response: {profile_data}")
     return profile_data
-
-@app.get("/api/user-management/get-full-profile")
-async def get_full_profile_proxy(request: Request, token: str = Depends(oauth2_scheme)):
-    auth_header = f"Bearer {token}"
-    return await proxy_get_full_profile(request, authorization=auth_header)
-
 
 @app.get("/api/anomaly-detection/results")
 async def api_get_anomaly_results(
@@ -226,11 +209,11 @@ async def fetch_all_sports():
 async def add_sport(sport: dict):
     return await create_sport(sport)
 
-@app.get("/api/nonacademic/clubs", response_model=list)
-async def fetch_all_clubs():
-    return await get_all_clubs()
-
 # Academic
+@app.get("/api/content/{content_id}")
+async def get_content_file(content_id: str):
+    return await get_content_by_id(content_id)
+
 @app.get("/api/content/file/{content_id}")
 async def get_content_file(content_id: str):
     return await get_content_file_by_id(content_id)
@@ -239,6 +222,7 @@ async def get_content_file(content_id: str):
 @app.get("/api/assignment/file/{assignment_id}")
 async def get_content_file(assignment_id: str):
     return await get_assignment_file_by_id(assignment_id)
+
 
 
 @app.get("/api/subject/{student_id}", response_model=List)
@@ -284,15 +268,19 @@ async def submit_assignment_file(
     file: UploadFile = File(...)
 ):
     return await upload_assignment_file(student_id, assignment_id, file)
-
-class StatusUpdateRequest(BaseModel):
-    student_id: str
+    
 
 @app.post("/api/content/{content_id}")
-async def mark_content_completed(content_id: str, payload: StatusUpdateRequest):
-    return await mark_content_done(content_id, payload.student_id)
+async def mark_content_completed(content_id: str):
+    success = await mark_content_done(content_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Content not found or not accessible")
+    return {"message": "Content marked as completed"}
+
+
 
 ###teacher 
+
 
 @app.get("/api/studentlist/{class_id}/{subject_id}")
 async def get_student_list(class_id: str, subject_id: str):
@@ -302,6 +290,8 @@ async def get_student_list(class_id: str, subject_id: str):
 @app.get("/api/submission/file/{submission_id}")
 async def get_submission_file(submission_id: str):
     return await get_submission_file_by_id(submission_id)
+
+
 
 
 @app.get("/api/subjectNclass/{teacher_id}")
@@ -342,27 +332,7 @@ async def upload_content(
     return await upload_content_request(class_id, subject_id, content_name, description, file)
 
 
-
-class SubmissionResponse(BaseModel):
-    submission_id: str
-    subject_id: str
-    subject_name: Optional[str] = None  
-    content_file_path: str
-    submit_time_date: datetime
-    class_id: str
-    class_name: Optional[str] = None
-    file_name: str
-    marks: Optional[int] = None
-    assignment_id: str
-    assignment_name: Optional[str] = None 
-    student_id: str
-    teacher_id: str
-
-class CategorizedSubmissionsResponse(BaseModel):
-    on_time_submissions: List[SubmissionResponse]
-    late_submissions: List[SubmissionResponse]
-
-@app.get("/api/submission_view/{teacher_id}", response_model=CategorizedSubmissionsResponse)
+@app.get("/api/submission_view/{teacher_id}", response_model=List)
 async def get_manual_submissions(teacher_id: str):
     return await view_ungraded_manual_submissions(teacher_id)
 
@@ -399,7 +369,7 @@ async def update_exam_marks(
 
     return await add_exam_marks_request(form_data)
 
-@app.get("/api/auto_graded_submissions/{teacher_id}",response_model=CategorizedSubmissionsResponse)
+@app.get("/api/auto_graded_submissions/{teacher_id}")
 async def get_auto_graded_submissions(teacher_id: str):
     return await view_auto_graded_submissions_request(teacher_id)
 
@@ -448,40 +418,43 @@ async def close_content_access(
     return await content_access_close(student_id, content_id)
 
 
+
 # 1. Visualization endpoint
 @app.get("/api/visualize_data/{subject_id}/{class_id}")
 async def Visualize(subject_id: str, class_id: str):
    return await Visualize_data_list(subject_id, class_id)
 
 
-class PredictionInput(BaseModel):
-    SpecialEventThisWeek: int
-    ResourcesUploadedThisWeek: int
 
 # 2. Prediction endpoint (POST with JSON body)
-@app.post("/api/predict_active_time/{subject_id}/{class_id}")
-async def gateway_prediction_endpoint(
-    subject_id: str,
-    class_id: str,
-    input_data: PredictionInput # Use the Pydantic model instead of Form data
+@app.post("/api/predict_active_time/")
+async def Prediction(
+    Weeknumber: int = Form(...),
+    SpecialEventThisWeek: int = Form(...),
+    ResourcesUploadedThisWeek: int = Form(...)
 ):
-    
-    return await call_prediction_service(subject_id, class_id, input_data)
-    
+    input_data = {
+        "Weeknumber": Weeknumber,
+        "SpecialEventThisWeek": SpecialEventThisWeek,
+        "ResourcesUploadedThisWeek": ResourcesUploadedThisWeek
+    }
+    return await active_time_prediction(input_data)
 
 
 # 3. Train model
-@app.post("/api/train/{subject_id}/{class_id}")
-async def TrainModel(subject_id: str, class_id: str):
-    return await model_train(subject_id, class_id)
+@app.post("/api/train_model/")
+async def TrainModel():
+    return await model_train()
 
+# 4. Load model
+@app.post("/api/load_model/")
+async def LoadModel():
+    return await load_model()
 
-
-@app.post("/api/update_collection/{subject_id}/{class_id}")
-async def Update(subject_id: str, class_id: str):
-    return await update_collection_active_time(subject_id, class_id)
-
-
+# 5. Get model status
+@app.get("/api/model_status/")
+async def ModelStatus():
+    return await get_model_status()
 
 
 
@@ -559,38 +532,13 @@ async def dashboard_engagement_score(student_id: str, class_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/dashboard/{student_id}/{class_id}/model-features")
-async def dashboard_model_features(student_id: str, class_id: str):
-    try:
-        return await model_features(student_id, class_id)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    
-@app.get("/api/dashboard/{student_id}/{class_id}/model-feedback")
-async def dashboard_model_feedback(student_id: str, class_id: str):
-    try:
-        return await get_model_feedback(student_id, class_id)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 #Teacher Dashboard Routes
-# @app.get("/api/teacher/dashboard/{teacher_id}/assignments")
-# async def teacher_assignments(teacher_id: str):
-#     try:
-#         return await get_teacher_assignments(teacher_id)
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
-    
 @app.get("/api/teacher/dashboard/{teacher_id}/assignments")
 async def teacher_assignments(teacher_id: str):
     try:
         return await get_teacher_assignments(teacher_id)
-    except httpx.HTTPStatusError as e:
-        logging.error(f"Dashboard service error: {e.response.status_code} - {e.response.text}")
-        raise HTTPException(status_code=e.response.status_code, detail=e.response.text)
     except Exception as e:
-        logging.error("Unexpected error: %s", traceback.format_exc())
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail=str(e))
     
 @app.get("/api/teacher/dashboard/classes")
 async def get_all_classes():
@@ -620,19 +568,6 @@ async def weekly_attendance(class_id: str = "CLS001", year: int = datetime.now()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/teacher/dashboard/low-academic-attendance")
-async def low_academic_attendance(threshold: float = 80.0):
-    try:
-        return await get_low_attendance_students(threshold)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) 
-    
-@app.get("/api/teacher/dashboard/low-attendance-count")
-async def low_attendance_count():
-    try:
-        return await get_low_attendance_students_count()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 #Admin Dashboard Routes
 @app.get("/api/admin/dashboard/users")
 async def users(search_with_id: str = None, role: str = None, class_id: str = None):
@@ -641,15 +576,6 @@ async def users(search_with_id: str = None, role: str = None, class_id: str = No
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-@app.get("/api/admin/dashboard/admin-access-profile")
-async def admin_access_profile_endpoint(user_id: str = Query(...)):
-    try:
-        return await forward_admin_access_profile(user_id)
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
-
 @app.get("/api/admin/dashboard/stats")
 async def stats():
     try:

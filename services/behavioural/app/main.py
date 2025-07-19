@@ -422,7 +422,6 @@ async def close_content_access(request_data: Dict):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-
 @router.post(
     "/update_weekly_data/{subject_id}/{class_id}",
     response_model=UpdateResponse
@@ -438,7 +437,32 @@ async def update_weekly_data(subject_id: str, class_id: str):
         # --- 2. Compute this week's UTC range (Mon 00:00 → next Mon 00:00) ---
         week_start, week_end = get_current_week_range()
 
-        # --- 3. Always get the next week number from the highest existing week number ---
+        # --- 3. Check if data for this week range already exists ---
+        existing_record = pred_coll.find_one({
+            "subject_id": subject_id,
+            "class_id": class_id,
+            "WeekStartDate": week_start,
+            "WeekEndDate": week_end,
+            "data": "1"  # Only check for real data, not predictions
+        })
+
+        if existing_record:
+            logger.info(f"Data for week range {week_start} → {week_end} already exists. "
+                       f"Returning existing record with Weeknumber={existing_record['Weeknumber']}")
+            
+            # Remove internal _id before returning
+            return_doc = {k: v for k, v in existing_record.items() if k != "_id"}
+            
+            return UpdateResponse(
+                success=True,
+                message="Weekly data for this period already exists.",
+                subject_id=subject_id,
+                class_id=class_id,
+                updated_week=existing_record["Weeknumber"],
+                calculated_data=return_doc
+            )
+
+        # --- 4. Get the next week number from the highest existing week number ---
         last_record = pred_coll.find_one(
             {
                 "subject_id": subject_id,
@@ -449,10 +473,10 @@ async def update_weekly_data(subject_id: str, class_id: str):
         last_week = last_record["Weeknumber"] if last_record else 0
         current_week_number = last_week + 1
 
-        logger.info(f"Using Weeknumber={current_week_number} for real data "
+        logger.info(f"Creating new record with Weeknumber={current_week_number} for real data "
                     f"(range {week_start} → {week_end})")
 
-        # --- 4. Aggregate TotalActiveTime ---
+        # --- 5. Aggregate TotalActiveTime ---
         b_pipeline = [
             {"$match": {
                 "subject_id": subject_id,
@@ -471,7 +495,7 @@ async def update_weekly_data(subject_id: str, class_id: str):
         b_res = list(behav_coll.aggregate(b_pipeline))
         total_active = round(b_res[0]["total"], 2) if b_res else 0.0
 
-        # --- 5. SpecialEventThisWeek (assignments) ---
+        # --- 6. SpecialEventThisWeek (assignments) ---
         asn_count = asn_coll.count_documents({
             "subject_id": subject_id,
             "class_id": class_id,
@@ -479,7 +503,7 @@ async def update_weekly_data(subject_id: str, class_id: str):
         })
         special_event = 1 if asn_count > 0 else 0
 
-        # --- 6. ResourcesUploadedThisWeek (content) ---
+        # --- 7. ResourcesUploadedThisWeek (content) ---
         c_pipeline = [
             {"$match": {
                 "subject_id": subject_id,
@@ -497,7 +521,7 @@ async def update_weekly_data(subject_id: str, class_id: str):
         c_res = list(cont_coll.aggregate(c_pipeline))
         resources_uploaded = c_res[0]["cnt"] if c_res else 0
 
-        # --- 7. Build the insert document ---
+        # --- 8. Build the insert document ---
         doc = {
             "Weeknumber": current_week_number,
             "TotalActiveTime": total_active,
@@ -510,7 +534,7 @@ async def update_weekly_data(subject_id: str, class_id: str):
             "data": "1"
         }
 
-        # --- 8. Insert new record (always create a new entry) ---
+        # --- 9. Insert new record (only if no existing record for this week range) ---
         result = pred_coll.insert_one(doc)
         
         # Remove any internal _id before returning
@@ -531,6 +555,9 @@ async def update_weekly_data(subject_id: str, class_id: str):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}"
         )
+
+
+
 
 app.include_router(router)
 app.include_router(predict_router, tags=["Endpoints prediction "])

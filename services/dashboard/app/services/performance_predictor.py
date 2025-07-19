@@ -24,25 +24,46 @@ def predict_performance(features_dict: dict) -> float:
     return round(float(prediction), 2)
 
 
-def determine_risk_level(current_score, score_diff):
-    if score_diff is None:  # No previous score exists
-        if current_score >= 75:
-            return "Low Risk"
-        elif current_score >= 50:
-            return "Medium Risk"
-        else:
-            return "High Risk"
+# def determine_risk_level(current_score, score_diff):
+#     if score_diff is None:  # No previous score exists
+#         if current_score >= 75:
+#             return "Low Risk"
+#         elif current_score >= 50:
+#             return "Medium Risk"
+#         else:
+#             return "High Risk"
+#     else:
+#         if score_diff < 0 and current_score < 70:
+#             return "High Risk (Declining)"
+#         elif score_diff < 0:
+#             return "Medium Risk (Declining)"
+#         elif current_score >= 75:
+#             return "Low Risk"
+#         elif current_score >= 50:
+#             return "Medium Risk"
+#         else:
+#             return "High Risk"
+
+def determine_risk_level(current_score, score_diff, previous_risk=None):
+    TOLERANCE = 0.05  # Small changes won't affect risk level
+
+    if score_diff is None or abs(score_diff) < TOLERANCE:
+        return previous_risk or (
+            "Low Risk" if current_score >= 75 else
+            "Medium Risk" if current_score >= 50 else
+            "High Risk"
+        )
+
+    if score_diff < -0.3 and current_score < 70:
+        return "High Risk (Declining)"
+    elif score_diff < 0:
+        return "Medium Risk (Declining)"
+    elif current_score >= 75:
+        return "Low Risk"
+    elif current_score >= 50:
+        return "Medium Risk"
     else:
-        if score_diff < 0 and current_score < 70:
-            return "High Risk (Declining)"
-        elif score_diff < 0:
-            return "Medium Risk (Declining)"
-        elif current_score >= 75:
-            return "Low Risk"
-        elif current_score >= 50:
-            return "Medium Risk"
-        else:
-            return "High Risk"
+        return "High Risk"
 
 
 @model_features_router.get("/{student_id}/{class_id}/model-features")
@@ -282,9 +303,10 @@ async def get_model_features(student_id: str, class_id: str):
         )
 
         previous_score = previous_entry["score"] if previous_entry else None
+        previous_risk = previous_entry.get("risk_level") if previous_entry else None
         score_diff = float(performance_score - previous_score) if previous_score is not None else None
 
-        risk_level = determine_risk_level(performance_score, score_diff)
+        risk_level = determine_risk_level(performance_score, score_diff, previous_risk)
 
         # === Store current prediction in collection ===
         perf_prediction_table.insert_one({

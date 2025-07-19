@@ -69,10 +69,14 @@ app.add_middleware(
 )
 
 # User-management
+# @app.post("/api/user-management/login/")
+# async def api_login(username: str = Form(...), password: str = Form(...)):
+#     credentials = {"username": username, "password": password}
+#     return await login_user(credentials)
 @app.post("/api/user-management/login/")
-async def api_login(username: str = Form(...), password: str = Form(...)):
+async def api_login(req: Request, username: str = Form(...), password: str = Form(...)):
     credentials = {"username": username, "password": password}
-    return await login_user(credentials)
+    return await login_user(req, credentials)  # ✅ Pass request
 
 @app.post("/api/user-management/logout")
 async def api_logout(

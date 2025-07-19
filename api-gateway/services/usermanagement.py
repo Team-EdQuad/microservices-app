@@ -24,23 +24,41 @@ router = APIRouter()
 
 
 # --- Login ---
-async def login_user(credentials: dict):
+# async def login_user(credentials: dict):
+#     try:
+#         async with httpx.AsyncClient() as client:
+#             # Send as form data instead of JSON
+#             response = await client.post(
+#                 f"{USER_MANAGEMENT_SERVICE_URL}/login",
+#                 data=credentials  # Changed from json= to data=
+#             )
+#             response.raise_for_status()
+#             return response.json()
+#     except httpx.HTTPStatusError as exc:
+#         print("Status code:", exc.response.status_code)
+#         print("Response text:", exc.response.text)
+#         raise HTTPException(status_code=exc.response.status_code, detail="Login failed")
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+async def login_user(req: Request, credentials: dict):
     try:
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": req.headers.get("user-agent", "Unknown")  # ✅ Forward this!
+        }
+
         async with httpx.AsyncClient() as client:
-            # Send as form data instead of JSON
             response = await client.post(
                 f"{USER_MANAGEMENT_SERVICE_URL}/login",
-                data=credentials  # Changed from json= to data=
+                data=credentials,
+                headers=headers
             )
             response.raise_for_status()
             return response.json()
     except httpx.HTTPStatusError as exc:
-        print("Status code:", exc.response.status_code)
-        print("Response text:", exc.response.text)
         raise HTTPException(status_code=exc.response.status_code, detail="Login failed")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 # --- Logout ---
 async def logout_user(user_id: str, role: str, authorization: str = None):

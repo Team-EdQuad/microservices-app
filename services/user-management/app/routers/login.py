@@ -17,22 +17,55 @@ class LoginRequest(BaseModel):
     password: str
 
 # Utility: Get client's IP address
+# def get_client_ip(req: Request):
+#     x_forwarded_for = req.headers.get("X-Forwarded-For")
+#     if x_forwarded_for:
+#         return x_forwarded_for.split(",")[0]
+#     return req.client.host
+
 def get_client_ip(req: Request):
+
+    # return "112.135.9.202"
+    
     x_forwarded_for = req.headers.get("X-Forwarded-For")
     if x_forwarded_for:
-        return x_forwarded_for.split(",")[0]
-    return req.client.host
+        ip = x_forwarded_for.split(",")[0]
+    else:
+        ip = req.client.host
+    print(f"Detected IP: {ip}")  # 👈 add this
+    return ip
 
 # Utility: Get location by IP
+# async def get_location(ip_address: str):
+#     try:
+#         async with httpx.AsyncClient() as client:
+#             response = await client.get(f"http://ip-api.com/json/{ip_address}")
+#             if response.status_code == 200:
+#                 data = response.json()
+#                 city = data.get('city', 'Unknown')
+#                 country = data.get('country', 'Unknown')
+#                 region = data.get('regionName', 'Unknown')
+#                 latitude = data.get('lat', 'Unknown')
+#                 longitude = data.get('lon', 'Unknown')
+#                 return f"{city}, {region}, {country} (Lat: {latitude}, Lon: {longitude})"
+#     except Exception as e:
+#         print(f"Location Fetch Error: {e}")
+#     return "Unknown"
 async def get_location(ip_address: str):
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get(f"http://ip-api.com/json/{ip_address}")
+            url = f"http://ip-api.com/json/{ip_address}"
+            print("Fetching location from:", url)  # 👈 Debug
+            response = await client.get(url)
+            print("Raw Location Response:", response.text)  # 👈 Debug
             if response.status_code == 200:
                 data = response.json()
+                if data.get("status") == "fail":
+                    print("Location fetch failed:", data.get("message"))
+                    return "Unknown"
                 city = data.get('city', 'Unknown')
-                country = data.get('country', 'Unknown')
                 region = data.get('regionName', 'Unknown')
+                country = data.get('country', 'Unknown')
                 latitude = data.get('lat', 'Unknown')
                 longitude = data.get('lon', 'Unknown')
                 return f"{city}, {region}, {country} (Lat: {latitude}, Lon: {longitude})"

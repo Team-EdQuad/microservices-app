@@ -421,12 +421,15 @@ async def close_content_access(request_data: Dict):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
-
 @router.post(
     "/update_weekly_data/{subject_id}/{class_id}",
     response_model=UpdateResponse
 )
 async def update_weekly_data(subject_id: str, class_id: str):
+    """
+    Calculates the latest weekly data and updates or inserts it into the database.
+    This uses an "upsert" logic to ensure data is always fresh.
+    """
     try:
         # --- 1. Collections ---
         pred_coll: Collection = db["active_time_prediction"]
@@ -437,46 +440,17 @@ async def update_weekly_data(subject_id: str, class_id: str):
         # --- 2. Compute this week's UTC range (Mon 00:00 → next Mon 00:00) ---
         week_start, week_end = get_current_week_range()
 
-        # --- 3. Check if data for this week range already exists ---
-        existing_record = pred_coll.find_one({
-            "subject_id": subject_id,
-            "class_id": class_id,
-            "WeekStartDate": week_start,
-            "WeekEndDate": week_end,
-            "data": "1"  # Only check for real data, not predictions
-        })
-
-        if existing_record:
-            logger.info(f"Data for week range {week_start} → {week_end} already exists. "
-                       f"Returning existing record with Weeknumber={existing_record['Weeknumber']}")
-            
-            # Remove internal _id before returning
-            return_doc = {k: v for k, v in existing_record.items() if k != "_id"}
-            
-            return UpdateResponse(
-                success=True,
-                message="Weekly data for this period already exists.",
-                subject_id=subject_id,
-                class_id=class_id,
-                updated_week=existing_record["Weeknumber"],
-                calculated_data=return_doc
-            )
-
-        # --- 4. Get the next week number from the highest existing week number ---
+        # --- 3. Get the potential next week number (used only if a new record is inserted) ---
         last_record = pred_coll.find_one(
-            {
-                "subject_id": subject_id,
-                "class_id": class_id,
-            },
+            {"subject_id": subject_id, "class_id": class_id},
             sort=[("Weeknumber", -1)]
         )
         last_week = last_record["Weeknumber"] if last_record else 0
         current_week_number = last_week + 1
 
-        logger.info(f"Creating new record with Weeknumber={current_week_number} for real data "
-                    f"(range {week_start} → {week_end})")
-
-        # --- 5. Aggregate TotalActiveTime ---
+        # --- 4. ALWAYS Aggregate Fresh Data for the Current Week ---
+        
+        # 4a. Aggregate TotalActiveTime
         b_pipeline = [
             {"$match": {
                 "subject_id": subject_id,
@@ -495,7 +469,7 @@ async def update_weekly_data(subject_id: str, class_id: str):
         b_res = list(behav_coll.aggregate(b_pipeline))
         total_active = round(b_res[0]["total"], 2) if b_res else 0.0
 
-        # --- 6. SpecialEventThisWeek (assignments) ---
+        # 4b. SpecialEventThisWeek (assignments)
         asn_count = asn_coll.count_documents({
             "subject_id": subject_id,
             "class_id": class_id,
@@ -503,7 +477,7 @@ async def update_weekly_data(subject_id: str, class_id: str):
         })
         special_event = 1 if asn_count > 0 else 0
 
-        # --- 7. ResourcesUploadedThisWeek (content) ---
+        # 4c. ResourcesUploadedThisWeek (content)
         c_pipeline = [
             {"$match": {
                 "subject_id": subject_id,
@@ -521,41 +495,62 @@ async def update_weekly_data(subject_id: str, class_id: str):
         c_res = list(cont_coll.aggregate(c_pipeline))
         resources_uploaded = c_res[0]["cnt"] if c_res else 0
 
-        # --- 8. Build the insert document ---
-        doc = {
-            "Weeknumber": current_week_number,
-            "TotalActiveTime": total_active,
+        # --- 5. Define the Filter and Update Payload for the Upsert Operation ---
+        
+        # The filter identifies the document for this specific subject, class, and week
+        query_filter = {
             "subject_id": subject_id,
             "class_id": class_id,
-            "SpecialEventThisWeek": special_event,
-            "ResourcesUploadedThisWeek": resources_uploaded,
             "WeekStartDate": week_start,
             "WeekEndDate": week_end,
             "data": "1"
         }
 
-        # --- 9. Insert new record (only if no existing record for this week range) ---
-        result = pred_coll.insert_one(doc)
+        # The payload contains the data to be set.
+        # $set: fields that are always updated.
+        # $setOnInsert: fields that are only set when a NEW document is created.
+        update_payload = {
+            "$set": {
+                "TotalActiveTime": total_active,
+                "SpecialEventThisWeek": special_event,
+                "ResourcesUploadedThisWeek": resources_uploaded,
+            },
+            "$setOnInsert": {
+                "Weeknumber": current_week_number,
+                "subject_id": subject_id,
+                "class_id": class_id,
+                "WeekStartDate": week_start,
+                "WeekEndDate": week_end,
+                "data": "1"
+            }
+        }
+
+        # --- 6. Execute the Upsert Operation ---
+        # This will update the document if it finds one, or insert it if it doesn't.
+        pred_coll.update_one(query_filter, update_payload, upsert=True)
         
-        # Remove any internal _id before returning
-        doc.pop("_id", None)
+        logger.info(f"Upserted weekly data for {subject_id}/{class_id} for week {week_start} -> {week_end}")
+
+        # --- 7. Retrieve the Final Document and Return ---
+        # We fetch the document again to ensure our response has the correct data.
+        final_doc = pred_coll.find_one(query_filter)
+        final_doc.pop("_id", None) # Remove MongoDB's internal _id
 
         return UpdateResponse(
             success=True,
-            message="Real weekly data inserted successfully.",
+            message="Weekly data updated/inserted successfully.",
             subject_id=subject_id,
             class_id=class_id,
-            updated_week=current_week_number,
-            calculated_data=doc
+            updated_week=final_doc["Weeknumber"],
+            calculated_data=final_doc
         )
 
     except Exception as e:
-        logger.exception(f"Error inserting real weekly data for {subject_id}/{class_id}")
+        logger.exception(f"Error upserting weekly data for {subject_id}/{class_id}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}"
         )
-
 
 
 

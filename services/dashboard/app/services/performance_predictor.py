@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException
 from .database import student_table, subject_table, content_table, student_content_table
 from .database import assignment_table, submission_table, academic_attendance_table
 from .database import exam_table, behavioural_table,student_login_table
-from .database import perf_prediction_table
+from .database import perf_prediction_table,grading_submissions
 from .ml_model_loader import model, avg_model, imputer, explainer
 from fastapi import APIRouter, HTTPException, Query
 import google.generativeai as genai
@@ -105,9 +105,16 @@ async def get_model_features(student_id: str, class_id: str):
 
         for i, subject_id in enumerate(subject_ids[:6]):
             assignments = list(assignment_table.find({"subject_id": subject_id, "class_id": class_id}))
-            submissions = list(submission_table.find({
+            # submissions = list(submission_table.find({
+            #     "student_id": student_id, "subject_id": subject_id, "class_id": class_id
+            # }))
+            manual_submissions = list(submission_table.find({
                 "student_id": student_id, "subject_id": subject_id, "class_id": class_id
             }))
+            auto_submissions = list(grading_submissions.find({
+                "student_id": student_id, "subject_id": subject_id, "class_id": class_id
+            }))
+            submissions = manual_submissions + auto_submissions
             sub_map = {s["assignment_id"]: s for s in submissions}
 
             marks_total = 0
